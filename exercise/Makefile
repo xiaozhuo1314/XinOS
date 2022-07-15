@@ -1,6 +1,6 @@
-EXEC = cc_nested
+EXEC = asm2c
 
-SRC = ${EXEC}.s
+SRC = ${EXEC}.s ${EXEC}.c
 
 GDBINIT = ./gdbinit
 
