@@ -50,11 +50,36 @@ static inline void _clear(struct Page *page) {
     page->flags = 0;
 }
 
+/* 对齐函数 */
+static inline uint32_t _align_page(uint32_t addr)
+{
+    uint32_t order = (1 << PAGE_ORDER) - 1;
+    return ((addr + order) & (~order));
+}
+
 /* 判断 */
 
 /* page初始化 */
 void page_init() {
-    // 页总个数
+    // 页的总个数
     _num_pages = (HEAP_SIZE  / PAGE_SIZE) - 8;
+    printf("HEAP_START = %x, HEAP_SIZE = %x, num of pages = %d\n", HEAP_START, HEAP_SIZE, _num_pages);
     
+    // 初始化heap前面的页管理信息
+    struct Page *page = (struct Page*)HEAP_START;
+    for(int i = 0; i < _num_pages; ++i)
+    {
+        _clear(page);
+        ++page;
+    }
+
+    // 设置开始和结束开辟内存的地方,注意位置要4k对齐
+    _alloc_start = _align_page(HEAP_START + 8 * PAGE_SIZE);
+    _alloc_end = _alloc_start + _num_pages * PAGE_SIZE;
+
+    printf("TEXT:   0x%x -> 0x%x\n", TEXT_START, TEXT_END);
+	printf("RODATA: 0x%x -> 0x%x\n", RODATA_START, RODATA_END);
+	printf("DATA:   0x%x -> 0x%x\n", DATA_START, DATA_END);
+	printf("BSS:    0x%x -> 0x%x\n", BSS_START, BSS_END);
+	printf("HEAP:   0x%x -> 0x%x\n", _alloc_start, _alloc_end);
 }

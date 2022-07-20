@@ -12,6 +12,8 @@ extern int uart_putc(char c);
 extern void uart_puts(char *p);
 extern void uart_gets(void);
 
-
+/* printf.c */
+extern int printf(const char *s, ...);
+extern void panic(char *s);
 
 #endif

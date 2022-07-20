@@ -13,6 +13,7 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl) {
             switch (*s)
             {
             case 'd': // %d
+            {
                 long num = (longarg ? va_arg(vl, long) : va_arg(vl, int));
                 // 负数的时候,就转换为正数,然后在缓冲区加一个负号即可
                 if(num < 0)
@@ -38,10 +39,14 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl) {
                 longarg = 0;
                 format = 0;
                 break;
+            }
             case 'l': // %ld
+            {
                 longarg = 1; // 因为后面还有个d,所以放到d那里去处理了
                 break;
+            }
             case 'p': // %p
+            {
                 longarg = 1; // p也是一个long,但是前面得加上0x
                 if(out && pos < n) 
                 {
@@ -53,13 +58,54 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl) {
                     out[pos] = 'x';
                 }
                 ++pos;
-                break;
+                // 不加break,是因为需要让%p向下执行%x十六进制的程序,这样就能打印出十六进制的地址
+            }
             case 'x': // %x十六进制
+            {
+                long num = (longarg ? va_arg(vl, long) : va_arg(vl, int));
+                // 每四个bit为一个十六进制位,所以一个字节就是2个十六进制位,例如int就是8个十六进制位
+                // 所以int的十六进制位占据pos + 0-7这8个位置
+                int hex_digits = 2 * (longarg ? sizeof(long) : sizeof(int));
+                for (int i = hex_digits - 1; i >= 0; --i)
+                {
+                    int d = ((num >> (4 * i)) & 0xF);
+                    if(out && pos < n)
+                    {
+                        out[pos] = (d < 10 ? '0' + d : 'a' + d - 10);
+                    }
+                    ++pos;
+                }
+                longarg = 0;
+                format = 0;
                 break;
+            }
             case 's':  // %s
+            {
+                const char *str = va_arg(vl, const char*);
+                while(*str)
+                {
+                    if(out && pos < n)
+                    {
+                        out[pos] = *str;
+                    }
+                    ++pos;
+                    ++str;
+                }
+                longarg = 0;
+                format = 0;
                 break;
+            }
             case 'c': // %c
+            {
+                if(out && pos < n)
+                {
+                    out[pos] = *s;
+                }
+                ++pos;
+                longarg = 0;
+                format = 0;
                 break;
+            }
             default: //浮点型先不搞
                 break;
             }
@@ -77,5 +123,47 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl) {
             ++pos;
         }
     }
-    
+    if(out && pos < n)
+    {
+        out[pos] = 0;
+    }
+    else if(out && n)
+    {
+        out[n - 1] = 0;
+    }
+    return pos;
+}
+
+static int _vprintf(const char *s, va_list vl)
+{
+    // 获取格式化之后的打印字符串的总长度 - 1,也就是最大的下标是多少
+    // 格式化之后的打印字符串的总长度是指将%d等格式已经转换为具体数字或字符之后的总长度
+    int res = _vsnprintf(NULL, -1, s, vl);
+    if(res + 1 >= sizeof(out_buf))
+    {
+        uart_puts("error: output string size overflow\n");
+        while(1);
+    }
+    _vsnprintf(out_buf, res + 1, s, vl);
+    uart_puts(out_buf);
+    return res;
+}
+
+/* s代表的是还未格式化的字符串,也就是printf的第一个参数 */
+int printf(const char *s, ...)
+{
+    int res = 0;
+    va_list vl;
+    va_start(vl, s);
+    res = _vprintf(s, vl);
+    va_end(vl);
+    return res;
+}
+
+void panic(char *s)
+{
+    printf("panic: ");
+    printf(s);
+    printf("\n");
+    while(1);
 }
