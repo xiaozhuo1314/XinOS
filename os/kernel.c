@@ -2,7 +2,9 @@
 
 void start_kernel(void) {
     uart_init();
-    uart_puts("hello world\n");
-    uart_gets();
+    printf("Hello XinOS\n");
+    // uart_gets();
+    page_init();
+    // page_test();
     while (1){}
 }

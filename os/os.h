@@ -16,4 +16,10 @@ extern void uart_gets(void);
 extern int printf(const char *s, ...);
 extern void panic(char *s);
 
+/* page.c */
+extern void page_init(void);
+extern void *page_alloc(int npages);
+extern void page_free(void *p);
+extern void page_test(void);
+
 #endif

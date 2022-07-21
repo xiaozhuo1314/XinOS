@@ -136,10 +136,10 @@ static int _vsnprintf(char * out, size_t n, const char* s, va_list vl) {
 
 static int _vprintf(const char *s, va_list vl)
 {
-    // 获取格式化之后的打印字符串的总长度 - 1,也就是最大的下标是多少
-    // 格式化之后的打印字符串的总长度是指将%d等格式已经转换为具体数字或字符之后的总长度
+    // 获取格式化之后的打印字符串的总长度(不包括最后的0)
+    // 格式化之后的打印字符串的总长度是指将%d等格式已经转换为具体数字或字符之后的总长度(不包括最后的0)
     int res = _vsnprintf(NULL, -1, s, vl);
-    if(res + 1 >= sizeof(out_buf))
+    if(res + 1 >= sizeof(out_buf)) //需要将最后的0也放入到out_buf中,所以res要+1
     {
         uart_puts("error: output string size overflow\n");
         while(1);

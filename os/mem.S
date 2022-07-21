@@ -1,4 +1,4 @@
-.section .memmap
+.section .rodata # 将下面的一堆指令属于rodata段,也就是将下面的常量放到rodata段
 
 .global TEXT_START
 TEXT_START: .word _text_start

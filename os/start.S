@@ -8,7 +8,21 @@
 _start:
     # 获取hart id
     csrr t0, mhartid # 每个hard都有自己的寄存器,而且每个hart都会执行本文件程序
+    mv tp, t0 # 将mhartid保存到tp, tp为用于本地线程数据的线程指针寄存器
     bnez t0, park  # 只有hart为0的能继续执行,否则就空转,因为本系统目前只有一个核
+
+    # 设置bss段的所有字节为0,当然这部分也可以用c语言来写
+    # 引用数字标签时需要加后缀,b表示引用的标签在该语句的前面，f则表示引用的标签在该语句之后。
+    la a0, _bss_start
+    la a1, _bss_end
+    bgeu a0, a1, 2f
+
+1:
+    sw zero, 0(a0)
+    addi a0, a0, 4
+    bltu a0, a1, 1b
+
+2:
     # 如果后面多个hart,那么每个hart都是用STACK_SIZE字节作为自己的栈
     # 所以每个hart的栈的起始位置为stacks + (t0 + 1) * STACK_SIZE
     # 加1是因为栈从高地址往低地址生长,所以初始位置在每个hart栈的高地址处,需要再加一个STACK_SIZE

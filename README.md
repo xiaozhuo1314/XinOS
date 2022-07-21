@@ -1,2 +1,2 @@
 # XinOS
-Operating System
+Operating System for RISC-V

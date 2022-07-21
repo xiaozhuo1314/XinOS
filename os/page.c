@@ -57,7 +57,23 @@ static inline uint32_t _align_page(uint32_t addr)
     return ((addr + order) & (~order));
 }
 
-/* 判断 */
+/* 判断页是否是空闲的 */
+static inline int _is_free(struct Page *page)
+{
+    return (page->flags & PAGE_TAKEN) ? 0 : 1;
+}
+
+/* 设置flags */
+static inline void _set_flags(struct Page *page, uint8_t flags)
+{
+    page->flags |= flags;
+}
+
+/* 判断是否是最后一个 */
+static inline int _is_last(struct Page *page)
+{
+    return (page->flags & PAGE_LAST) ? 1 : 0;
+}
 
 /* page初始化 */
 void page_init() {
@@ -66,6 +82,9 @@ void page_init() {
     printf("HEAP_START = %x, HEAP_SIZE = %x, num of pages = %d\n", HEAP_START, HEAP_SIZE, _num_pages);
     
     // 初始化heap前面的页管理信息
+    // 由于page是Page类型的指针,指向的为uint8_t的数值
+    // 所以++page每次走过一个字节,而不是4K,所以虽然这里使用的是_num_pages,但是指的heap最前面的页管理信息
+    // 因为后面的_num_pages个4K页的_num_pages个管理信息在前部
     struct Page *page = (struct Page*)HEAP_START;
     for(int i = 0; i < _num_pages; ++i)
     {
@@ -82,4 +101,87 @@ void page_init() {
 	printf("DATA:   0x%x -> 0x%x\n", DATA_START, DATA_END);
 	printf("BSS:    0x%x -> 0x%x\n", BSS_START, BSS_END);
 	printf("HEAP:   0x%x -> 0x%x\n", _alloc_start, _alloc_end);
+}
+
+/* 按照页个数分配内存 */
+void *page_alloc(int npages)
+{
+    if(npages < 1)
+    {
+        return NULL;
+    }
+    int found = 0;
+    // end_page指的是管理信息中的
+    int end_page = _num_pages - npages;
+    // page指向页管理信息的第0项
+    // 后面的4K页是存放数据,前面的页管理信息才是控制4K页的属性,所以应该是对页管理信息进行修改
+    // 而不是真正的4K页
+    struct Page *page = (struct Page*)HEAP_START;
+    struct Page *tmp = NULL;
+    for(int i = 0; i < end_page; ++i)
+    {
+        if(_is_free(page))
+        {
+            found = 1;
+            tmp = page;
+            for (int j = 1; j < npages; ++j)
+            {
+                if(!_is_free(++tmp))
+                {
+                    found = 0;
+                    break;
+                }
+            }
+
+            if(found)
+            {
+                tmp = page;
+                for(int j = 0; j < npages; ++j)
+                {
+                    _set_flags(tmp++, PAGE_TAKEN);
+                }
+                // 最后一个还需要设置为last
+                --tmp;
+                _set_flags(tmp, PAGE_LAST);
+                return (void*)(_alloc_start + i * PAGE_SIZE);
+            }
+        }
+        ++page;
+    }
+    return NULL;
+}
+
+/* 按页释放内存 */
+void page_free(void *p)
+{
+    if(!p || (uint32_t)p >= _alloc_end) return;
+
+    struct Page *page = (struct Page *)HEAP_START + ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+
+    while(!_is_free(page))
+    {
+        if(_is_last(page))
+        {
+            _clear(page);
+            break;
+        }
+        else
+        {
+            _clear(page++);
+        }
+    }
+}
+
+void page_test()
+{
+    void *p = page_alloc(2);
+	printf("p = 0x%x\n", p);
+	//page_free(p);
+
+	void *p2 = page_alloc(7);
+	printf("p2 = 0x%x\n", p2);
+	page_free(p2);
+
+	void *p3 = page_alloc(4);
+	printf("p3 = 0x%x\n", p3);
 }
