@@ -30,20 +30,58 @@ static uint32_t _num_pages = 0;
 /* 用于4K对齐,4K是2的12次方,对齐方式见函数_align_page */
 #define PAGE_ORDER 12
 
+/* 页内block的大小 */
+#define MALLOC_SIZE 4
+
+/* 页内能分配成block的最大字节 */
+#define ALLOCABLE_SIZE 3276
+
+/* 页内管理block的管理信息的字节 */
+#define MALLOC_TABLE_SIZE 820
+
 /* 页管理信息 */
 #define PAGE_TAKEN (uint8_t)(1 << 0)
 #define PAGE_LAST (uint8_t)(1 << 1)
+#define PAGE_FIRST (uint8_t)(1 << 2)
+/* 与malloc和free有关的页/block管理信息 */
+#define BLOCK_TAKEN (uint8_t)(1 << 0);
+#define BLOCK_LAST (uint8_t)(1 << 1);
+#define BLOCK_FIRST (uint8_t)(1 << 2);
+#define PAGE_MALLOC (uint8_t)(1 << 3) // 当前页是被malloc管理的
+#define PAGE_SOFT_FIRST (uint8_t)(1 << 4) // 表示前一页是被page_alloc分配的,不是malloc分配的
+
+/* 1 << 5暂未使用, 1 << 6和1 << 7表示当前页中有多少block被使用 */
 
 /*
  * 页描述结构体
  * flags: 8 bits
- * bit 0: 是否被使用了PAGE_TAKEN
- * bit 1: 是否是一大段内存的最后一页
+ *   bit 0: 是否被使用了
+ *   bit 1: 是否是一大段内存的最后一页
+ *   bit 2: 是否是一大段内存的第一页
  */
 struct Page
 {
     uint8_t flags;
 };
+
+/*
+ * block描述结构体
+ * flags: 8 bits
+ *   bit 0: 是否被使用了
+ *   bit 1: 是否是内存的最后一个block
+ *   bit 2: 是否是内存的第一个一个block
+ *   bit 3: 当前页是被malloc管理的
+ *   bit 4: 前一页是被page_alloc分配的,不是malloc分配的
+ *   bit 5: 暂未使用
+ *   bit 6: 表示当前页中有多少block被使用, 是10 bit位的倒数第二高位
+ *   bit 7: 表示当前页中有多少block被使用, 是10 bit位的最高位
+ *   这里的bit 6和bit 7只有第819 block才有意义
+*/
+struct Block
+{
+    uint8_t flags;
+};
+
 
 /* 清除页信息,也就是回收页 */
 static inline void _clear(struct Page *page) {
@@ -89,6 +127,10 @@ void page_init() {
     for(int i = 0; i < _num_pages; ++i)
     {
         _clear(page);
+        if(i < _num_pages - 1)
+        {
+            _set_flags(page, PAGE_TAKEN);
+        }
         ++page;
     }
 
@@ -118,7 +160,7 @@ void *page_alloc(int npages)
     // 而不是真正的4K页
     struct Page *page = (struct Page*)HEAP_START;
     struct Page *tmp = NULL;
-    for(int i = 0; i < end_page; ++i)
+    for(int i = 0; i <= end_page; ++i)
     {
         if(_is_free(page))
         {
@@ -136,6 +178,7 @@ void *page_alloc(int npages)
             if(found)
             {
                 tmp = page;
+                _set_flags(page, PAGE_FIRST);
                 for(int j = 0; j < npages; ++j)
                 {
                     _set_flags(tmp++, PAGE_TAKEN);
@@ -172,16 +215,47 @@ void page_free(void *p)
     }
 }
 
+/* 
+ * 实现malloc
+ * 在4K页内,每4字节作为一个block,4K的最后820字节作为当前页中block的管理信息
+ * 前面的3276字节作为待分配的内存,3276字节共有819个block,4K共有1024个block
+ * 所以将820字节的8位,加上819字节的最高2位,这样一共10位,正好能够覆盖所有的1024个block
+ * 这样最后一个block的管理信息最多只能6位表示,由于管理信息具有普适性,那么所有的block的管理信息
+ * 只需要最多6位即可,实际上在这个简易os上足够了
+ */
+void *malloc(size_t size)
+{
+    void *mem = NULL;
+    /* 判断待分配内存的大小 */
+    if(size <= ALLOCABLE_SIZE) // 按照malloc来分配
+    {
+        struct Page *page = (struct Page*)HEAP_START;
+        for(int i = 0; i < _num_pages; ++i)
+        {
+            
+        }
+    }
+    else if(size > ALLOCABLE_SIZE && size <= PAGE_SIZE) // 直接按照一页来分配
+    {
+
+    }
+    else // 前面的按照页,剩下的按照malloc分配
+    {
+
+    }
+    return mem;
+}
+
 void page_test()
 {
-    void *p = page_alloc(2);
+    void *p = page_alloc(1);
 	printf("p = 0x%x\n", p);
-	//page_free(p);
+	page_free(p);
 
-	void *p2 = page_alloc(7);
-	printf("p2 = 0x%x\n", p2);
-	page_free(p2);
+	// void *p2 = page_alloc(7);
+	// printf("p2 = 0x%x\n", p2);
+	// page_free(p2);
 
-	void *p3 = page_alloc(4);
-	printf("p3 = 0x%x\n", p3);
+	// void *p3 = page_alloc(4);
+	// printf("p3 = 0x%x\n", p3);
 }
