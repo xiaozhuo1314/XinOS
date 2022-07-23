@@ -43,11 +43,11 @@ static uint32_t _num_pages = 0;
 #define PAGE_TAKEN (uint8_t)(1 << 0)
 #define PAGE_LAST (uint8_t)(1 << 1)
 #define PAGE_FIRST (uint8_t)(1 << 2)
-/* 与malloc和free有关的页/block管理信息 */
-#define BLOCK_TAKEN (uint8_t)(1 << 0);
-#define BLOCK_LAST (uint8_t)(1 << 1);
-#define BLOCK_FIRST (uint8_t)(1 << 2);
 #define PAGE_MALLOC (uint8_t)(1 << 3) // 当前页是被malloc管理的
+/* 与malloc和free有关的页/block管理信息 */
+#define BLOCK_TAKEN (uint8_t)(1 << 0)
+#define BLOCK_LAST (uint8_t)(1 << 1)
+#define BLOCK_FIRST (uint8_t)(1 << 2)
 #define PAGE_SOFT_FIRST (uint8_t)(1 << 4) // 表示前一页是被page_alloc分配的,不是malloc分配的
 
 /* 1 << 5暂未使用, 1 << 6和1 << 7表示当前页中有多少block被使用 */
@@ -58,6 +58,7 @@ static uint32_t _num_pages = 0;
  *   bit 0: 是否被使用了
  *   bit 1: 是否是一大段内存的最后一页
  *   bit 2: 是否是一大段内存的第一页
+ *   bit 3: 当前页是否是被malloc控制的
  */
 struct Page
 {
@@ -70,7 +71,7 @@ struct Page
  *   bit 0: 是否被使用了
  *   bit 1: 是否是内存的最后一个block
  *   bit 2: 是否是内存的第一个一个block
- *   bit 3: 当前页是被malloc管理的
+ *   bit 3: 暂未使用
  *   bit 4: 前一页是被page_alloc分配的,不是malloc分配的
  *   bit 5: 暂未使用
  *   bit 6: 表示当前页中有多少block被使用, 是10 bit位的倒数第二高位
@@ -113,6 +114,25 @@ static inline int _is_last(struct Page *page)
     return (page->flags & PAGE_LAST) ? 1 : 0;
 }
 
+/* 判断是否是malloc控制的页 */
+static inline int _is_malloced(struct Page *page)
+{
+    return (page->flags & PAGE_MALLOC) ? 1 : 0;
+}
+
+/* 通过page获取页内存初始位置 */
+static inline void *_get_mem_by_page(struct Page *page)
+{
+    return (void*)(_alloc_start + (page - (struct Page*)HEAP_START) * PAGE_SIZE);
+}
+
+/* 通过地址获取页内存的初始位置 */
+static inline void *_get_mem_by_addr(void *p)
+{
+    uint32_t page_count = ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+    return (void*)(page_count * PAGE_SIZE + _alloc_start);
+}
+
 /* page初始化 */
 void page_init() {
     // 页的总个数
@@ -127,10 +147,6 @@ void page_init() {
     for(int i = 0; i < _num_pages; ++i)
     {
         _clear(page);
-        if(i < _num_pages - 1)
-        {
-            _set_flags(page, PAGE_TAKEN);
-        }
         ++page;
     }
 
@@ -216,6 +232,110 @@ void page_free(void *p)
 }
 
 /* 
+ * 通过页初始位置获取页中block的初始位置 
+ * 参数为页的初始位置
+ */
+struct Block *_get_block_by_addr(void *p)
+{
+    return (struct Block*)(p + ALLOCABLE_SIZE - 1);
+}
+
+/*
+ * block是否是free
+ */
+int _is_block_free(struct Block *block)
+{
+    return (block->flags & BLOCK_TAKEN) ? 0 : 1;
+}
+
+/* 设置block属性 */
+void _set_block_flags(struct Block *block, uint8_t flags)
+{
+    block->flags |= flags;
+}
+
+/* 
+ * 初始化malloc
+ * p指的是页的初始地址 
+ */
+struct Block *_malloc_init(void *p)
+{
+    struct Block *block = _get_block_by_addr(p);
+    struct Block *tmp = block;
+    for (int i = 0; i < MALLOC_TABLE_SIZE; ++i, ++tmp)
+    {
+        tmp->flags = 0;
+    }
+    return block;
+}
+
+/* 增加一个页中block使用数目 */
+static inline void _increase_block_usage_of_malloc(struct Block *block)
+{
+    // 页中block数目位的低地址block
+    struct Block *low_block = block + MALLOC_TABLE_SIZE - 1;
+    // 页中block数目位的高地址block
+    struct Block *high_block = block + MALLOC_TABLE_SIZE - 2;
+    // 加一
+    if(low_block->flags == 255)
+    {
+        high_block->flags += (1 << 6);
+    }
+    /* 
+     * 如果要是low_block->flags小于255,下面的语句是正确的
+     * 如果要是low_block->flags等于255,正确的做法是low_block->flags加一后超过表示的最大数值而往前进一
+     * 上面的语句high_block->flags += (1 << 6)相当于往前进一
+     * 且low_block->flags++后low_block->flags为256,但是由于low_block->flags是8位的,所以此时会溢出变成0
+     * 所以下面语句在low_block->flags等于255也是正确的
+     */
+    low_block->flags++; 
+}
+
+/* 尝试去分配内存 */
+void *_try_malloc(void *p, size_t size)
+{
+    // 获取页的初始位置
+    p = _get_mem_by_addr(p);
+    // 获取页中block的初始位置
+    struct Block *block, *block_start;
+    block_start = block = _get_block_by_addr(p);
+    // 需要多少个block
+    int block_total = size / MALLOC_SIZE;
+    if(size % MALLOC_SIZE) block_total += 1;
+    int end_index = MALLOC_TABLE_SIZE - block_total;
+    for(int i = 0; i < end_index; ++i, ++block) // 由于MALLOC_TABLE_SIZE比实际的block个数多1,所以这里不加等于
+    {
+        if(_is_block_free(block))
+        {
+            struct Block *tmp = block;
+            int found = 1;
+            for(int j = 1; j < block_total; ++j, ++tmp)
+            {
+                if(!_is_block_free(tmp))
+                {
+                    found = 0;
+                    break;
+                }
+            }
+            if(found)
+            {
+                tmp = block;
+                _set_block_flags(block, BLOCK_FIRST);
+                for(int j = 0; j < block_total; ++j, ++tmp)
+                {
+                    _set_block_flags(tmp, BLOCK_TAKEN);
+                    // 页中block的使用数目加一
+                    _increase_block_usage_of_malloc(block_start);
+                }
+                _set_block_flags(--tmp, BLOCK_LAST);
+                return (void*)(p + i * MALLOC_SIZE);
+            }
+        }
+    }
+    return NULL;
+}
+
+/* 
  * 实现malloc
  * 在4K页内,每4字节作为一个block,4K的最后820字节作为当前页中block的管理信息
  * 前面的3276字节作为待分配的内存,3276字节共有819个block,4K共有1024个block
@@ -230,9 +350,24 @@ void *malloc(size_t size)
     if(size <= ALLOCABLE_SIZE) // 按照malloc来分配
     {
         struct Page *page = (struct Page*)HEAP_START;
-        for(int i = 0; i < _num_pages; ++i)
+        for(int i = 0; i < _num_pages; ++i, ++page)
         {
-            
+            // 当前页是被malloc控制的,那么就尝试在这个里面分配内存
+            if(_is_malloced(page))
+            {
+                
+            }
+            else if(_is_free(page)) // 如果不是被malloc控制但是空闲
+            {
+                // 设置页的属性
+                _set_flags(page, PAGE_TAKEN | PAGE_LAST | PAGE_FIRST | PAGE_MALLOC);
+                // 获取页内存初始位置
+                mem = _get_mem_by_page(page);
+                // 初始化malloc管理信息
+                _malloc_init(mem);
+                // 尝试去分配block内存,成功则返回,否则就进行下一循环
+                if((mem = _try_malloc(mem, size)) != NULL) return mem;
+            }
         }
     }
     else if(size > ALLOCABLE_SIZE && size <= PAGE_SIZE) // 直接按照一页来分配
