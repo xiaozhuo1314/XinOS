@@ -120,6 +120,12 @@ static inline int _is_malloced(struct Page *page)
     return (page->flags & PAGE_MALLOC) ? 1 : 0;
 }
 
+/* 判断是否是第一页 */
+static inline int _is_page_first(struct Page *page)
+{
+    return (page->flags & PAGE_FIRST) ? 1 : 0;
+}
+
 /* 通过page获取页内存初始位置 */
 static inline void *_get_start_mem_by_page(struct Page *page)
 {
@@ -221,9 +227,20 @@ void *page_alloc(int npages)
 /* 按页释放内存 */
 void page_free(void *p)
 {
-    if(!p || (uint32_t)p >= _alloc_end) return;
+    if(!p || (uint32_t)p >= _alloc_end || (uint32_t)p < _alloc_start) return;
 
     struct Page *page = (struct Page *)HEAP_START + ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+
+    // 若是分配了几页连续的内存A,然后从中间的某个位置B开始 page_free,然后下一次从B开始分配新区域
+    // 此时再去page_free掉A剩下的,由于此时剩下的A中的最后一页没有PAGE_LAST标志,那么就会连同B新分配的一起free了
+    // 所以若出现从中间的某个位置B开始 page_free,此时B所在的页不是PAGE_FIRST,那么就需要将前一页设置为PAGE_LAST
+    if(!_is_page_first(page))
+    {
+        struct Page *prev_page = page - 1;
+        void *prev = _get_start_mem_by_page(prev_page);
+        if((uint32_t)prev >= _alloc_start && !_is_page_free(prev_page))
+            _set_page_flags(prev_page, PAGE_LAST);
+    }
 
     while(!_is_page_free(page))
     {
@@ -279,6 +296,12 @@ void _set_block_flags(struct Block *block, uint8_t flags)
 static inline int _is_block_last(struct Block *block)
 {
     return (block->flags & BLOCK_LAST) ? 1 : 0;
+}
+
+/* 判断是否是第一个block */
+static inline int _is_block_first(struct Block *block)
+{
+    return (block->flags & BLOCK_FIRST) ? 1 : 0;
 }
 
 /* 
@@ -518,6 +541,17 @@ void free(void *p)
         struct Block *block = _get_block_by_addr(p);
         // 获取p所在页的block管理信息的初始block
         struct Block *block_start = _get_start_block_by_addr(_get_start_mem_by_addr(p));
+
+        // 若是分配了几页连续的malloc内存A,然后从中间的某个位置B开始 free,然后下一次从B开始分配新区域
+        // 此时再去free掉A剩下的,由于此时剩下的A中的最后的block没有BLOCK_LAST标志,那么就会连同B新分配的一起free了
+        // 所以若出现从中间的某个位置B开始 free,此时B所在的block不是BLOCK_FIRST,那么就需要将前一block设置为BLOCK_LAST
+        if(!_is_block_first(block))
+        {
+            struct Block *prev_block = block - 1;
+            if((uint32_t)prev_block >= (uint32_t)block_start && !_is_block_free(prev_block))
+                _set_block_flags(prev_block, BLOCK_LAST);
+        }
+
         while(!_is_block_free(block))
         {
             /*
@@ -527,11 +561,13 @@ void free(void *p)
              * 同时819那个最高两位是个数而不是属性,所以不能直接等于0
              * 其他的block管理信息的最高两位没啥用,本来就是0
              * 所以这里清除block信息直接低6位置0即可
+             * 但是清楚最低6位后管理信息就没了,所以要先暂存信息
              */
+            int is_last = _is_block_last(block);
             block->flags = (block->flags >> 6) << 6;
             // 减少block数量
             _decrease_block_usage_of_malloc(block_start);
-            if(_is_block_last(block))
+            if(is_last)
             {
                 break;
             }
@@ -671,7 +707,7 @@ void page_test()
     printf("\n\n==============> END page_test <==============\n\n");
 }
 
-void molloc_test()
+void malloc_test()
 {
     printf("\n\n==============> molloc_test <==============\n\n");
     

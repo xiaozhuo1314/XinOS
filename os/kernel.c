@@ -5,6 +5,6 @@ void start_kernel(void) {
     printf("Hello XinOS\n");
     // uart_gets();
     page_init();
-    // page_test();
+    malloc_test();
     while (1){}
 }
