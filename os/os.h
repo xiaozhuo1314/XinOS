@@ -20,7 +20,9 @@ extern void panic(char *s);
 extern void page_init(void);
 extern void *page_alloc(int npages);
 extern void page_free(void *p);
-extern void page_test(void);
-extern void malloc_test(void);
+extern void *malloc(size_t size);
+extern void free(void *p);
+// extern void page_test(void);
+// extern void malloc_test(void);
 
 #endif

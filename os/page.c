@@ -709,7 +709,7 @@ void page_test()
 
 void malloc_test()
 {
-    printf("\n\n==============> molloc_test <==============\n\n");
+    printf("\n\n==============> malloc_test <==============\n\n");
     
     page_init();
     
@@ -744,7 +744,7 @@ void malloc_test()
     printf("p1 = 0x%x\n", p1);
     printf("Page Table:\n");
     printPageInfo(page,16);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("free(p1);\n");
@@ -755,41 +755,41 @@ void malloc_test()
     printf("void * p2 = malloc(sizeof(short));\n");
     void * p2 = malloc(sizeof(short));
     printf("p2 = 0x%x\n", p2);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("void * p3 = malloc(sizeof(int));\n");
     void * p3 = malloc(sizeof(int));
     printf("p3 = 0x%x\n", p3);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("void * p4 = malloc(sizeof(long long int));\n");
     void * p4 = malloc(sizeof(long long int));
     printf("p4 = 0x%x\n", p4);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("void * p5 = malloc(sizeof(long double));\n");
     void * p5 = malloc(sizeof(long double));
     printf("p5 = 0x%x\n", p5);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("free(p5+4);\n");
     free(p5+4);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("free(p4+4);\n");
     free(p4+4);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("void * p6 = malloc(sizeof(int));\n");
     void * p6 = malloc(sizeof(int));
     printf("p6 = 0x%x\n", p6);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     printf("void * p7 = malloc(sizeof(int)*819);\n");
@@ -797,7 +797,7 @@ void malloc_test()
     printf("p7 = 0x%x\n", p7);
     printf("Page Table:\n");
     printPageInfo(page,16);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
     free(p7+sizeof(int)*818);
@@ -826,8 +826,8 @@ void malloc_test()
     printf("void * p9 = malloc(sizeof(int));\n");
     void * p9 = malloc(sizeof(int));
     printf("p9 = 0x%x\n", p9);
-    printf("Molloc Table:\n");
+    printf("malloc Table:\n");
     printBlockInfo(mallocTable, 40);
 
-    printf("\n\n==============> END molloc_test <==============\n\n"); 
+    printf("\n\n==============> END malloc_test <==============\n\n"); 
 }
