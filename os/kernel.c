@@ -6,5 +6,9 @@ void start_kernel(void) {
 
     page_init();
 
+    sched_init();
+
+    schedule();
+    printf("Never Be Here\n");
     while (1){}
 }

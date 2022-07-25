@@ -23,6 +23,7 @@ _start:
     bltu a0, a1, 1b
 
 2:
+    # 因为要start_kernel要调用初始化函数,必须要有栈,会自动用sp指向的位置作为栈,去执行start_kernel中的一些初始化函数
     # 如果后面多个hart,那么每个hart都是用STACK_SIZE字节作为自己的栈
     # 所以每个hart的栈的起始位置为stacks + (t0 + 1) * STACK_SIZE
     # 加1是因为栈从高地址往低地址生长,所以初始位置在每个hart栈的高地址处,需要再加一个STACK_SIZE
