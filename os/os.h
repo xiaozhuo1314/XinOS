@@ -41,6 +41,8 @@ struct context {
 	reg_t t5;
 	reg_t t6;
 };
+/* 任务的类型 */
+typedef void (*task_func)(void);
 
 /* uart.h */
 extern void uart_init(void);
@@ -64,5 +66,11 @@ extern void free(void *p);
 /* sched.c */
 extern void sched_init(void);
 extern void schedule(void);
+extern void task_delay(volatile int cnt);
+extern void task_yield(void);
+extern int task_create(task_func task);
+
+/* user.c */
+extern void os_main(void);
 
 #endif

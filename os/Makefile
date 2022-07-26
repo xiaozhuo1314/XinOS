@@ -20,6 +20,7 @@ SRCS_C = \
 	printf.c \
 	page.c \
 	sched.c \
+	user.c \
 
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)
