@@ -31,7 +31,8 @@ extern void sched_init(void);
 extern void schedule(void);
 extern void task_delay(volatile int cnt);
 extern void task_yield(void);
-extern int task_create(task_func task);
+extern int task_create(task_func task, void *param, int priority);
+extern void task_exit(void);
 
 /* user.c */
 extern void os_main(void);

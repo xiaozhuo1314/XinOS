@@ -3,7 +3,7 @@
 /* _tasks_num表示当前执行的任务数量,包括正在执行和被切换下去的任务 */
 static int _tasks_num = 0;
 /* _task_idx表示当前正在hart上执行的task的索引,由于本系统只有一个hart能够执行任务,所以_task_idx每次只有一个确定的值 */
-static int _task_idx = -1;
+// static int _task_idx = -1;
 /* cur_task表示当前task */
 struct taskInfo *cur_task = NULL;
 /* first_task表示第一个task,也就是优先级最高的task */
@@ -29,6 +29,58 @@ void sched_init()
     w_mscratch(0);
 }
 
+/* 插入新任务到链表 */
+int insert_task(struct taskInfo * new_task)
+{
+    // 现在还没有任务
+    if(first_task == NULL && _tasks_num == 0)
+    {
+        first_task = new_task;
+        ++_tasks_num;
+        return 0;
+    }
+    // 现在有了任务,但是first_task为空
+    if(first_task == NULL) return -1;
+    // 从前往后找进行插入,优先级相同的话按照先进先出的原则
+    // 先判断是否是开头
+    if(new_task->priority < first_task->priority)
+    {
+        new_task->next = first_task;
+        first_task = new_task;
+    }
+    else
+    {
+        struct taskInfo *it = first_task;
+        struct taskInfo *prev = first_task;
+        while(it && new_task->priority >= it->priority)
+        {
+            prev = it;
+            it = it->next;
+        }
+
+        prev->next = new_task;
+        new_task->next = it;
+    }
+    ++_tasks_num;
+    return 0;
+}
+
+/* 从任务链表中取得一个任务 */
+struct taskInfo *pop_task()
+{
+    if(first_task == NULL)
+        return NULL;
+    struct taskInfo *task = first_task;
+    if(task->priority < 256)
+        task->priority++; //减小优先级,否则就只能一直高优先级执行了
+    
+    // 将任务拿出来,降低优先级后再放到任务链表中
+    first_task = first_task->next;
+    --_tasks_num; //减小数量,然后重新插入
+    insert_task(task);
+    return task;
+}
+
 /* 调度函数 */
 void schedule()
 {
@@ -39,36 +91,45 @@ void schedule()
     }
     // 获取要调度的task Id,下一个执行任务都是当前执行任务的下一个id,不执行的任务都被切换到了内存中
     // 所以这里不会乱,会按照任务的索引依次循环执行
-    _task_idx = (_task_idx + 1) % _tasks_num;
-    struct context *next = &(task_ctx[_task_idx]);
+    if((cur_task = pop_task()) == NULL)
+    {
+        panic("pop task failed!");
+        return;
+    }
+    struct context *next = &(cur_task->ctx);
     switch_to(next);
+}
+
+/* 退出任务 */
+void task_exit()
+{
+    if(cur_task == NULL)
+        return;
+    if(cur_task->task_id == first_task->task_id) 
+    {
+        first_task = first_task->next;
+    }
+    else
+    {
+        // 查找cur_task的前后,是的前后的节点越过cur_task直接相连
+        struct taskInfo *it = first_task;
+        struct taskInfo *prev = first_task;
+        while(it && it->task_id != cur_task->task_id)
+        {
+            prev = it;
+            it = it->next;
+        }
+        prev->next = cur_task->next;
+    }
+    free((void *)cur_task);
+    --_tasks_num;
+    schedule();
 }
 
 /* 函数等待并切换下一个任务 */
 void task_yield()
 {
     schedule();
-}
-
-/* 插入新任务到链表 */
-int insert_task(struct taskInfo * new_task)
-{
-    if(!first_task) return -1;
-    // 从前往后找进行插入,优先级相同的话按照先进先出的原则
-    // 先判断是否是开头
-    if(new_task->priority < first_task->priority)
-    {
-        new_task->next = first_task;
-        first_task = new_task;
-        return 0;
-    }
-    struct taskInfo *it = first_task;
-    struct taskInfo *prev = first_task;
-    while(it && new_task->priority >= it->priority)
-        prev = it++;
-    prev->next = new_task;
-    new_task->next = it;
-    return 0;
 }
 
 /* 
@@ -91,9 +152,14 @@ int task_create(task_func task, void *param, int priority)
     new_task->next = NULL;
     new_task->ctx.sp = (reg_t)(&(task_stack[_tasks_num][STACK_SIZE - 1]));
     new_task->ctx.ra = (reg_t)task;
+    if(param != NULL)
+        new_task->ctx.a0 = (reg_t)param;
     // 插入新任务到任务链表中
-    if(!insert_task(new_task))
+    if(insert_task(new_task) < 0)
+    {
+        printf("插入任务失败\n");
+        free((void *)new_task);
         return -1;
-    ++_tasks_num;
+    }
     return 0;
 }
