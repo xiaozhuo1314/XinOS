@@ -27,6 +27,12 @@ void sched_init()
 {
     // 首先设置mscratch寄存器的值为0,任务调度在schedule执行
     w_mscratch(0);
+    // 初始化内核任务
+    os_task.task_id = 0;
+    os_task.priority = 0;
+    os_task.next = NULL;
+    os_task.ctx.sp = (reg_t)(&(os_stack[STACK_SIZE - 1]));
+    os_task.ctx.ra = (reg_t)kernel;
 }
 
 /* 插入新任务到链表 */
@@ -81,7 +87,7 @@ struct taskInfo *pop_task()
     return task;
 }
 
-/* 调度函数 */
+/* 用户任务调度函数 */
 void schedule()
 {
     if(_tasks_num <= 0)
@@ -126,7 +132,13 @@ void task_exit()
     schedule();
 }
 
-/* 函数等待并切换下一个任务 */
+/* 返回内核任务 */
+void back_os()
+{
+    switch_to(&(os_task.ctx));
+}
+
+/* 切换下一个用户任务 */
 void task_yield()
 {
     schedule();

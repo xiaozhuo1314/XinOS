@@ -58,9 +58,13 @@ extern void switch_to(struct context *next);
 
 /* 任务栈大小 */
 #define STACK_SIZE 1024
+/* 内核栈 */
+uint8_t os_stack[STACK_SIZE];
+/* 内核taskInfo */
+struct taskInfo os_task;
 /* 任务栈,由于任务个数最多10个,所以就申请10个栈 */
 uint8_t task_stack[MAX_TASK_NUM][STACK_SIZE];
 /* 任务要保存的寄存器的结构体变量 */
-struct context task_ctx[MAX_TASK_NUM];
+// struct context task_ctx[MAX_TASK_NUM];
 
 #endif
