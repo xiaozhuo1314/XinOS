@@ -21,6 +21,7 @@ SRCS_C = \
 	page.c \
 	sched.c \
 	user.c \
+	trap.c \
 
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)

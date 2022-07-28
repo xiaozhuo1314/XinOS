@@ -6,6 +6,8 @@ void start_kernel(void) {
     printf("Hello XinOS\n");
     // 内存管理初始化
     page_init();
+    // trap初始化
+    trap_init();
     // 任务调度初始化
     sched_init();
     // 返回到内核执行

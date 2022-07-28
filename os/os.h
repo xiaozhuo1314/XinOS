@@ -1,6 +1,7 @@
 #ifndef __OS_H__
 #define __OS_H__
 
+#include "riscv.h"
 #include "type.h"
 #include "platform.h"
 #include "sched.h"
@@ -40,5 +41,9 @@ extern void user_init(void);
 
 /* kernel.c */
 extern void kernel(void);
+
+/* trap.c */
+extern void trap_init(void);
+extern void trap_test(void);
 
 #endif

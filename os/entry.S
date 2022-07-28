@@ -74,10 +74,55 @@
 	lw t6, 120(\base)
 .endm
 
+    .text
+
+# trap的处理过程分为四大步: trap初始化 -> trap的top half -> trap的bottom half -> 从trap返回,这四步能够被软件控制的为第一步和第三步
+# trap初始化指的是设置trap处理基址,在这里就是trap处理函数的地址,即设置mtvec寄存器
+# trap的top half是硬件完成的,包含以下四步：
+#   1. 把mstatus寄存器的mie值复制到mpie备份,待将来恢复,并设置mie为0,
+#      mie是控制machine模式下的中断,那么此时就关中断了,即不去处理在执行trap函数时发生的中断
+#   2. 设置mepc备份pc寄存器,同时pc寄存器设置为mtvec寄存器的值,需要注意的是,
+#      异常发生时mepc备份完pc后里面保存的是导致异常指令的地址,即处理完后还是去执行发生异常的语句,
+#      中断发生时mepc备份完pc后里面保存的是中断指令的下一条语句,即处理完后就执行中断的下一条语句了,不会再执行中断指令
+#   3. 根据trap的种类设置mcause,并根据需要设置mtval附加信息
+#   4. 将trap发生前的权限模式保存到mstatus的mpp中,再把hart权限模式改为machine,也就是说无论在何权限模式下触发trap,hart首先切换到machine模式
+# trap的bottom half就是自定义的trap处理函数,主要分为五步:
+#   1. 保存当前控制流的上下文
+#   2. 调用c语言写的trap handler
+#   3. 从trap handler函数返回,由于该函数可能返回下一指令的地址,所以mepc寄存器的值可能需要调整
+#   4. 恢复上下文信息
+#   5. 执行mret指令返回到trap之前的状态(也就是下一步从trap返回)
+# 从trap返回与权限级别有关,在不同权限级别下退出trap有各自的返回指令,对于软件而言就是mret、sret、uret,以mret为例,它执行以下三步:
+#   1. 当前hart的权限模式从mstatus的mpp中恢复,然后设置mstatus的mpp为user模式
+#   2. mstatus.mie从mstatus.mpie恢复,即mstatus.mie=mstatus.mpie,然后设置mstatus.mpie=1
+#   3. 恢复pc寄存器为mpec的值
+# 中断处理函数入口
+	.global trap_vector
+	.align 4
+trap_vector:
+	# 1.保存当前控制流的上下文
+	csrrw t6, mscratch, t6 # 将当前上下文的地址保存到t6寄存器,用于保存上下文
+	reg_save t6 # 保存时还有个原来的t6寄存器值没有保存,此时需要去保存
+	mv t5, t6 # 保存上下文内存地址,用于后面保存t6原有的值
+	csrr t6, mscratch # 恢复t6的值
+	sw t6, 120(t5) # 保存t6的值
+	csrw mscratch, t5 # 将上下文地址恢复到mscratch
+	# 2.传递参数并执行c语言写的trap handler
+	csrr a0, mepc # mepc为第一个参数,即中断或异常处理函数完后的第一条指令
+	csrr a1, mcause # 造成中断或异常的原因
+	call trap_handler # 执行c语言函数
+	# 3.从trap handler函数返回,并调整mepc
+	csrw mepc, a0
+	# 4.恢复上下文信息
+	csrr t6, mscratch
+	reg_restore t6
+	# 5.执行mret指令返回到trap之前的状态
+	mret
+
+# 切换上下文函数
     # mscratch用于保存内存中存储寄存器值的地址,也就是结构体context在内存中的地址
     # 这里用t6当作reg_restore和reg_save函数的参数原因是,t6是最后一个存储的
     # 可以在switch_to函数中进行设置,当然也可以让t5之类的最后存储
-    .text
     .global switch_to
     .align 4
 switch_to:

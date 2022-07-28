@@ -10,6 +10,9 @@ void user_task1(void *param)
     {
         printf("Task 0: Running...\n");
         task_delay(DELAY);
+        // 测试trap
+        trap_test();
+
         back_os();
     }
 }
