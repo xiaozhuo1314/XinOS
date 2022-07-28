@@ -41,7 +41,7 @@ void user_task3(void *param)
 /* 创建所有用户任务函数 */
 void user_init()
 {
-    task_create(user_task1, NULL, 150);
-    task_create(user_task2, NULL, 200);
-    task_create(user_task3, NULL, 250);
+    task_create(user_task1, NULL, 100);
+    task_create(user_task2, NULL, 105);
+    task_create(user_task3, NULL, 110);
 }

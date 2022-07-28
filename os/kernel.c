@@ -29,10 +29,10 @@ void kernel()
     // 内核任务开始
     while (1)
     {
-        printf("======== OS Starts Next User's Task =====");
+        printf("======== OS Starts Next User's Task =====\n");
         // 开启其中一个用户任务,这样hart就会去执行用户任务,而不会去执行下面的内核语句了
         task_yield();
-        printf("===== BACK 2 OS =====");
+        printf("===== BACK 2 OS =====\n");
         task_delay(10000);
     }
 }
