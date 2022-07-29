@@ -79,8 +79,8 @@
 # trap的处理过程分为四大步: trap初始化 -> trap的top half -> trap的bottom half -> 从trap返回,这四步能够被软件控制的为第一步和第三步
 # trap初始化指的是设置trap处理基址,在这里就是trap处理函数的地址,即设置mtvec寄存器
 # trap的top half是硬件完成的,包含以下四步：
-#   1. 把mstatus寄存器的mie值复制到mpie备份,待将来恢复,并设置mie为0,
-#      mie是控制machine模式下的中断,那么此时就关中断了,即不去处理在执行trap函数时发生的中断
+#   1. 把mstatus寄存器的mie值复制到mstatus寄存器的mpie备份,待将来恢复,并设置mstatus寄存器的mie为0,
+#      mstatus寄存器的mie是控制machine模式下的中断总开关,那么此时就关中断了,即不去处理在执行trap函数时发生的中断
 #   2. 设置mepc备份pc寄存器,同时pc寄存器设置为mtvec寄存器的值,需要注意的是,
 #      异常发生时mepc备份完pc后里面保存的是导致异常指令的地址,即处理完后还是去执行发生异常的语句,
 #      中断发生时mepc备份完pc后里面保存的是中断指令的下一条语句,即处理完后就执行中断的下一条语句了,不会再执行中断指令

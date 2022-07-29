@@ -13,6 +13,7 @@ extern void uart_init(void);
 extern int uart_putc(char c);
 extern void uart_puts(char *p);
 extern void uart_gets(void);
+extern void uart_ier(void);
 
 /* printf.c */
 extern int printf(const char *s, ...);
@@ -44,6 +45,11 @@ extern void kernel(void);
 
 /* trap.c */
 extern void trap_init(void);
-extern void trap_test(void);
+// extern void trap_test(void);
+
+/* plic.c */
+extern void plic_init(void);
+extern int plic_claim(void);
+extern void plic_complete(int irq);
 
 #endif

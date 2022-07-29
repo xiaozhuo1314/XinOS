@@ -81,6 +81,10 @@ void uart_init() {
     // disabled baud latch
     lcr = 0x03;
     uart_write_reg(LCR, lcr);
+
+    // 开启receiver ready interrupt,即开启uart从键盘接收字符的中断给系统
+    uint8_t ier = uart_read_reg(IER);
+    uart_write_reg(IER, ier | (1 << 0));
 }
 
 int uart_putc(char c) {
@@ -96,7 +100,17 @@ void uart_puts(char *p) {
     }
 }
 
-/* 输入字符 */
+/* 获取单个字符 */
+int uart_getc()
+{
+    // LSR第0位表示是否有数据到来,0代表没有
+    if(uart_read_reg(LSR) & LSR_RX_READY)
+        return uart_read_reg(RHR);
+    else
+        return -1;
+}
+
+/* 轮询方式输入字符 */
 void uart_gets() {
     char c;
     while(1) {
@@ -115,4 +129,29 @@ void uart_gets() {
         }
     }
     uart_puts("Goodbye\n");
+}
+
+/* 中断方式获取字符并打印到屏幕 */
+void uart_ier()
+{
+    while (1)
+    {
+        int num = uart_getc();
+        if(num == -1)
+            break;
+        char c = (char)num;
+        if(c == '\r' || c == '\n') 
+        {
+            uart_puts("\r\n");
+        } 
+        else if(c == 127 || c == 8) 
+        {
+            // 删除字符就得要这样写
+            uart_puts("\b \b");
+        } 
+        else 
+        {
+            uart_putc(c);
+        }
+    }
 }

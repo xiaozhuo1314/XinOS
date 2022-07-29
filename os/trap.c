@@ -8,6 +8,25 @@ void trap_init()
     w_mtvec((reg_t)trap_vector);
 }
 
+/* 外部中断处理函数 */
+void external_interrupt_handler()
+{
+    // 获取plic中当前优先级最高的中断源id
+    int irq = plic_claim();
+    if(irq == UART0_IRQ) //去读取键盘输入
+    {
+        uart_ier();
+    }
+    else if(irq)
+    {
+        printf("unexpected interrupt irq = %d\n", irq);
+    }
+
+    // 完成后要发送complete
+    if(irq)
+        plic_complete(irq);
+}
+
 reg_t trap_handler(reg_t epc, reg_t cause)
 {
     // 这里传递过来的epc为指令地址,如果是异常那就是产生异常的语句,如果是中断那就是产生中断的语句的下一条语句
@@ -24,7 +43,8 @@ reg_t trap_handler(reg_t epc, reg_t cause)
             printf("timer interruption!\n");
             break;
         case 11:
-            printf("external interruption!\n");
+            // printf("external interruption!\n");
+            external_interrupt_handler();
             break;
         default:
             printf("unknown async exception!\n");

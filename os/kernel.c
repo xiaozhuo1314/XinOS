@@ -8,6 +8,8 @@ void start_kernel(void) {
     page_init();
     // trap初始化
     trap_init();
+    // plic初始化
+    plic_init();
     // 任务调度初始化
     sched_init();
     // 返回到内核执行
