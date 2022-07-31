@@ -93,9 +93,9 @@
 #   4. 恢复上下文信息
 #   5. 执行mret指令返回到trap之前的状态(也就是下一步从trap返回)
 # 从trap返回与权限级别有关,在不同权限级别下退出trap有各自的返回指令,对于软件而言就是mret、sret、uret,以mret为例,它执行以下三步:
-#   1. 当前hart的权限模式从mstatus的mpp中恢复,然后设置mstatus的mpp为user模式
+#   1. 当前hart的权限模式从mstatus的mpp中恢复,然后设置mstatus的mpp为user模式(如果hart不支持U则为M)
 #   2. mstatus.mie从mstatus.mpie恢复,即mstatus.mie=mstatus.mpie,然后设置mstatus.mpie=1
-#   3. 恢复pc寄存器为mpec的值
+#   3. 恢复pc寄存器为mepc的值
 # 中断处理函数入口
 	.global trap_vector
 	.align 4

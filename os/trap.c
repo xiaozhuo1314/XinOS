@@ -40,7 +40,8 @@ reg_t trap_handler(reg_t epc, reg_t cause)
             printf("software interruption!\n");
             break;
         case 7:
-            printf("timer interruption!\n");
+            // printf("timer interruption!\n");
+            timer_handler();
             break;
         case 11:
             // printf("external interruption!\n");

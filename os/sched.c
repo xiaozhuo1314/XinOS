@@ -129,6 +129,8 @@ void task_exit()
     }
     free((void *)cur_task);
     --_tasks_num;
+    // 这里是不是要设置mscratch为0呢,需要调试到schedule中switch_to函数中看一下
+    // 是否会将当前正在执行的要被退出的任务保存上下文
     schedule();
 }
 

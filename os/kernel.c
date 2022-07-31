@@ -10,6 +10,8 @@ void start_kernel(void) {
     trap_init();
     // plic初始化
     plic_init();
+    // 硬件定时器初始化
+    timer_init();
     // 任务调度初始化
     sched_init();
     // 返回到内核执行
