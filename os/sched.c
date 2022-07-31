@@ -30,6 +30,7 @@ void sched_init()
     // 初始化内核任务
     os_task.task_id = 0;
     os_task.priority = 0;
+    os_task.timeslice = (uint32_t)0xffffffff;
     os_task.next = NULL;
     os_task.ctx.sp = (reg_t)(&(os_stack[STACK_SIZE - 1]));
     os_task.ctx.pc = (reg_t)kernel; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc
@@ -154,7 +155,7 @@ void task_yield()
  * 任务创建函数
  * 参数为待执行任务的第一条指令的地址,所带的参数,任务优先级
  */
-int task_create(task_func task, void *param, int priority)
+int task_create(task_func task, void *param, int priority, uint32_t timeslice)
 {
     if(_tasks_num >= MAX_TASK_NUM)
         return -1;
@@ -167,6 +168,7 @@ int task_create(task_func task, void *param, int priority)
     struct taskInfo *new_task = (struct taskInfo *)malloc(sizeof(struct taskInfo));
     new_task->task_id = _tasks_num;
     new_task->priority = priority;
+    new_task->timeslice = timeslice;
     new_task->next = NULL;
     new_task->ctx.sp = (reg_t)(&(task_stack[_tasks_num][STACK_SIZE - 1]));
     new_task->ctx.pc = (reg_t)task; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc

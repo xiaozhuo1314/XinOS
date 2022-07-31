@@ -46,6 +46,7 @@ struct context {
 struct taskInfo {
     int task_id; // 任务id
     int priority; // 任务优先级
+	uint32_t timeslice; // 任务在操作系统调度后能够运行的最长时间
     struct taskInfo *next; // 后一个任务的指针
     struct context ctx; // 任务的上下文结构体的指针
 };

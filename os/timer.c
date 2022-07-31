@@ -4,6 +4,10 @@
 #define TIMER_INTERVAL CLINT_TIMEBASE_FREQ
 
 static uint32_t _ticks = 0;
+static uint32_t _cur_task_start_tick = 0;
+
+// sched.c中的当前任务
+extern struct taskInfo *cur_task;
 
 /* 
  * mtime寄存器是实时计数器,上电后硬件复位为0并开始记录tick,表示系统运行了多少个tick,即多少时间,这个寄存器仅此一个,所有hart共享
@@ -90,6 +94,12 @@ void timer_handler()
     elapsed_time();
     // 重新设置mtimecmp寄存器清除mip.mtip,并且等待下一个硬件定时器中断
     timer_load(TIMER_INTERVAL);
-    // 由于back_os之后会选择一个用户任务执行,所以调用back_os应该在最后,这样前面的timer_load等函数才能重新设置定时器
-    back_os();
+    // 运行时间已经大于等于任务单次调度能够运行的最大时间了
+    // 当前任务在当初选择的时候就已经是优先级最高的任务了,即使选择出来后降低优先级又插回到任务链表中
+    if(_ticks - _cur_task_start_tick >= cur_task->timeslice)
+    {
+        _cur_task_start_tick = _ticks;
+        // 由于back_os之后会选择一个用户任务执行,所以调用back_os应该在最后,这样前面的timer_load等函数才能重新设置定时器
+        back_os();
+    }
 }
