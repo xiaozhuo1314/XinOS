@@ -65,6 +65,7 @@
  * On reset, each msip register is cleared to zero.
  */
 #define CLIENT_BASE 0x2000000L
+#define CLIENT_MSIP(hart_id) (CLIENT_BASE + (hart_id) * 4) //32位,但是高31位不可用,最后一位映射到mip.msip,表示machine模式的软中断在pending,当时用完后需要将该寄存器设置为0,使pending结束
 #define CLIENT_MTIME (CLIENT_BASE + 0xBFF8) // 64位,硬件会自动设置
 #define CLIENT_MTIMECMP(hart_id) (CLIENT_BASE + 0x4000 + (hart_id) * 8) // 64位
 

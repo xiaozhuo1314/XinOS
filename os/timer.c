@@ -28,8 +28,8 @@ void timer_init()
     // mtimecmp寄存器加载ticks,使得1s后触发中断
     timer_load(TIMER_INTERVAL);
 
-    // 设置全局中断打开
-    w_mstatus(r_mstatus() | MSTATUS_MIE);
+    // 设置全局中断打开,在plic_init中已经开启了,这里不需要再次开启
+    // w_mstatus(r_mstatus() | MSTATUS_MIE);
 
     // 设置mie寄存器中硬件定时器开启
     w_mie(r_mie() | MIE_MTIE);
@@ -90,4 +90,6 @@ void timer_handler()
     elapsed_time();
     // 重新设置mtimecmp寄存器清除mip.mtip,并且等待下一个硬件定时器中断
     timer_load(TIMER_INTERVAL);
+    // 由于back_os之后会选择一个用户任务执行,所以调用back_os应该在最后,这样前面的timer_load等函数才能重新设置定时器
+    back_os();
 }

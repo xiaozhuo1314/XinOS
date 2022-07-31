@@ -32,7 +32,9 @@ void sched_init()
     os_task.priority = 0;
     os_task.next = NULL;
     os_task.ctx.sp = (reg_t)(&(os_stack[STACK_SIZE - 1]));
-    os_task.ctx.ra = (reg_t)kernel;
+    os_task.ctx.pc = (reg_t)kernel; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc
+    // 设置mie寄存器中软件定时器开启
+    w_mie(r_mie() | MIE_MSIE);
 }
 
 /* 插入新任务到链表 */
@@ -143,7 +145,9 @@ void back_os()
 /* 切换下一个用户任务 */
 void task_yield()
 {
-    schedule();
+    // 抢占式系统中,任务要想主动放弃hart,需要生成软中断
+    reg_t hart_id = r_tp();
+    *((uint32_t*)CLIENT_MSIP(hart_id)) = 1;
 }
 
 /* 
@@ -165,7 +169,7 @@ int task_create(task_func task, void *param, int priority)
     new_task->priority = priority;
     new_task->next = NULL;
     new_task->ctx.sp = (reg_t)(&(task_stack[_tasks_num][STACK_SIZE - 1]));
-    new_task->ctx.ra = (reg_t)task;
+    new_task->ctx.pc = (reg_t)task; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc
     if(param != NULL)
         new_task->ctx.a0 = (reg_t)param;
     // 插入新任务到任务链表中

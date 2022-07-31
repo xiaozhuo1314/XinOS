@@ -37,6 +37,9 @@ struct context {
 	reg_t t4;
 	reg_t t5;
 	reg_t t6;
+
+	// pc寄存器指向下一条指令的位置
+	reg_t pc;
 };
 
 /* 任务的结构体 */

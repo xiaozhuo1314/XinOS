@@ -106,6 +106,9 @@ trap_vector:
 	mv t5, t6 # 保存上下文内存地址,用于后面保存t6原有的值
 	csrr t6, mscratch # 恢复t6的值
 	sw t6, 120(t5) # 保存t6的值
+	# 抢占式任务需要保存pc的值到内存中,由于在trap的top half中已经将pc的值保存到了mepc中了,所以这里需要保存mepc即可
+	csrr a0, mepc
+	sw a0, 124(t5) # 保存mepc的值
 	csrw mscratch, t5 # 将上下文地址恢复到mscratch
 	# 2.传递参数并执行c语言写的trap handler
 	csrr a0, mepc # mepc为第一个参数,即中断或异常处理函数完后的第一条指令
@@ -126,23 +129,31 @@ trap_vector:
     .global switch_to
     .align 4
 switch_to:
-    csrrw t6, mscratch, t6 # 互换mscratch和t6的值,此时t6指向了当前结构体context在内存中的地址,mscratch备份了t6的值
-    beqz t6, 1f #如果t6不为0,说明前一句汇编执行前mscratch不为0,说明此时是有任务在执行的,否则的话说明没有任务在执行,也就不需要去备份寄存器了
-    reg_save t6 # 调用宏,将寄存器的值存储到t6指向的内存中
+	# 由于抢占式任务执行是在中断中完成的切换,而在trap_vector中已经有了保存上下文到内存中,因此这里不需要保存了
+    # csrrw t6, mscratch, t6 # 互换mscratch和t6的值,此时t6指向了当前结构体context在内存中的地址,mscratch备份了t6的值
+    # beqz t6, 1f #如果t6不为0,说明前一句汇编执行前mscratch不为0,说明此时是有任务在执行的,否则的话说明没有任务在执行,也就不需要去备份寄存器了
+    # reg_save t6 # 调用宏,将寄存器的值存储到t6指向的内存中
     # 下面要将t6原来的值存储到内存中,由于t6原来的值备份到了mscratch中,所以需要取出来放到内存中
     # 将mscratch中原t6的值还给t6后,t6就不再指向内存中结构体context的地址,那么现在就没有寄存器指向内存中结构体context地址了
     # 所以需要使用一个寄存器先把t6指向的内存地址保存起来,再去把mscratch中原t6的值还给t6,这里采用t5保存t6指向的内存地址
     # 因为t5的值已经被reg_save宏备份到了内存中了
-    mv t5, t6
-    csrr t6, mscratch
-    sw t6, 120(t5)
-1:
-    # 1用于将传递过来的新结构体context的地址放到mscratch寄存器中,并将新结构体载入到各个寄存器中
+    # mv t5, t6
+    # csrr t6, mscratch
+    # sw t6, 120(t5)
+# 1:
+    # 用于将传递过来的新结构体context的地址放到mscratch寄存器中,并将新结构体载入到各个寄存器中
     csrw mscratch, a0
+	# 将a0指向的结构体中的pc值恢复给mepc
+	lw a1, 124(a0)
+	csrw mepc, a1
     # t6要作为reg_restore的参数,也就是t6保存的是新结构体context的地址,也就是a0中的值
     mv t6, a0
     reg_restore t6
-    # 函数返回,此时切换上下文成功
-    ret
+    # 函数返回,此时切换上下文成功,这里要注意的是,mret与ret是不一样的
+	# ret是call指令的返回,意思是ret后会去执行ra寄存器里面代表的指令,也就是call指令的下一条指令,它的作用应该是将ra中的指令复制给pc,然后去执行
+	# mret指令是将mepc的指令赋值给pc,相当于直接去执行mepc中的指令,这个指令不一定是ra寄存器里面代表的指令,也就不一定是call指令的下一条指令
+	# 所以用call调用switch_to函数,但是在switch_to函数中改变了mepc中的指令,那么就会去执行mepc中的指令,而不是trap_vector中call指令的下一条指令
+	# 也就是说这里直接去执行新任务了,不会再返回trap_vector中继续执行了
+    mret
 
 .end

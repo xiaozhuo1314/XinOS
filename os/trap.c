@@ -27,6 +27,15 @@ void external_interrupt_handler()
         plic_complete(irq);
 }
 
+void software_interrupt_handler()
+{
+    // 关闭当前的软中断
+    reg_t hart_id = r_tp();
+    *((uint32_t*)CLIENT_MSIP(hart_id)) = 0;
+    // 任务切换
+    schedule();
+}
+
 reg_t trap_handler(reg_t epc, reg_t cause)
 {
     // 这里传递过来的epc为指令地址,如果是异常那就是产生异常的语句,如果是中断那就是产生中断的语句的下一条语句
@@ -37,7 +46,8 @@ reg_t trap_handler(reg_t epc, reg_t cause)
         switch (cause_code)
         {
         case 3:
-            printf("software interruption!\n");
+            // printf("software interruption!\n");
+            software_interrupt_handler();
             break;
         case 7:
             // printf("timer interruption!\n");
