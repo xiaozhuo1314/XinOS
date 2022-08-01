@@ -109,6 +109,14 @@ void schedule()
     switch_to(next);
 }
 
+/* 切换下一个用户任务 */
+void task_yield()
+{
+    // 抢占式系统中,任务要想主动放弃hart,需要生成软中断
+    reg_t hart_id = r_tp();
+    *((uint32_t*)CLIENT_MSIP(hart_id)) = 1;
+}
+
 /* 退出任务 */
 void task_exit()
 {
@@ -132,8 +140,8 @@ void task_exit()
     }
     free((void *)cur_task);
     --_tasks_num;
-    // 这里是不是要设置mscratch为0呢,需要调试到schedule中switch_to函数中看一下
-    // 是否会将当前正在执行的要被退出的任务保存上下文
+    // 这里按照之前非抢占式情况会将当前正在执行的要被退出的任务保存上下文
+    // 但是抢占式之后switch_to函数没有保存指令了,所以就不会保存了,不需要设置mscratch为0了
     schedule();
 }
 
@@ -141,14 +149,6 @@ void task_exit()
 void back_os()
 {
     switch_to(&(os_task.ctx));
-}
-
-/* 切换下一个用户任务 */
-void task_yield()
-{
-    // 抢占式系统中,任务要想主动放弃hart,需要生成软中断
-    reg_t hart_id = r_tp();
-    *((uint32_t*)CLIENT_MSIP(hart_id)) = 1;
 }
 
 /* 
