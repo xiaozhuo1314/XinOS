@@ -76,6 +76,19 @@
 
     .text
 
+# atomic_swap用于原子化获取锁的状态并尝试加锁
+# amoswap.w.aq rd, rs1, (rs2)
+# amoswap.w.aq中rs2寄存器中存储的是内存地址,该原子指令可认为有以下步骤:
+#   1.获取rs1中寄存器的值A,获取rs2中存储的内存地址中的值B
+#   2.将B存储到rd中,将A存储到rs2指向的内存地址上
+	.global atomic_swap
+	.align 4
+atomic_swap:
+	li a5, 1
+	amoswap.w.aq a5, a5, 0(a0)
+	mv a0, a5
+	ret
+
 # trap的处理过程分为四大步: trap初始化 -> trap的top half -> trap的bottom half -> 从trap返回,这四步能够被软件控制的为第一步和第三步
 # trap初始化指的是设置trap处理基址,在这里就是trap处理函数的地址,即设置mtvec寄存器
 # trap的top half是硬件完成的,包含以下四步：

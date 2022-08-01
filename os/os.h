@@ -5,6 +5,7 @@
 #include "type.h"
 #include "platform.h"
 #include "sched.h"
+#include "lock.h"
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -56,5 +57,9 @@ extern void plic_complete(int irq);
 extern void timer_load(int interval);
 extern void timer_init(void);
 extern void timer_handler(void); 
+
+/* lock.h */
+extern void lock_acquire(lock_t *lock);
+extern void lock_free(lock_t *lock);
 
 #endif

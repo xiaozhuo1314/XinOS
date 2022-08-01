@@ -2,6 +2,8 @@
 
 #define DELAY 1000
 
+lock_t lock;
+
 /* 用户任务0 */
 void user_task1(void *param)
 {
@@ -24,6 +26,9 @@ void user_task2(void *param)
     while(1)
     {
         printf("Task 2: Running...\n");
+        lock_acquire(&lock);
+        printf("Task 2 got lock\n");
+        lock_free(&lock);
         task_delay(DELAY);
     }
     task_exit();
@@ -36,6 +41,9 @@ void user_task3(void *param)
     while(1)
     {
         printf("Task 3: Running...\n");
+        lock_acquire(&lock);
+        printf("Task 3 got lock\n");
+        lock_free(&lock);
         task_delay(DELAY);
     }
     task_exit();

@@ -142,7 +142,7 @@ void task_exit()
     --_tasks_num;
     // 这里按照之前非抢占式情况会将当前正在执行的要被退出的任务保存上下文
     // 但是抢占式之后switch_to函数没有保存指令了,所以就不会保存了,不需要设置mscratch为0了
-    schedule();
+    task_yield(); // 不知道为啥直接调用schedule函数会出现异常
 }
 
 /* 返回内核任务 */
