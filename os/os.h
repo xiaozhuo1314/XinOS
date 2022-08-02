@@ -6,6 +6,7 @@
 #include "platform.h"
 #include "sched.h"
 #include "lock.h"
+#include "timer.h"
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -57,6 +58,9 @@ extern void plic_complete(int irq);
 extern void timer_load(int interval);
 extern void timer_init(void);
 extern void timer_handler(void); 
+extern void timer_init(void);
+extern struct timer *timer_create(timer_func func, void *args, uint32_t timeout);
+extern void timer_delete(struct timer *t);
 
 /* lock.h */
 extern void lock_acquire(lock_t *lock);

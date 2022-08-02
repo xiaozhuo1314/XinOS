@@ -2,8 +2,8 @@
 
 /* _tasks_num表示当前执行的任务数量,包括正在执行和被切换下去的任务 */
 static int _tasks_num = 0;
-/* _task_idx表示当前正在hart上执行的task的索引,由于本系统只有一个hart能够执行任务,所以_task_idx每次只有一个确定的值 */
-// static int _task_idx = -1;
+/* 每次生成新任务时的task id */
+static int _task_id = 1;
 /* cur_task表示当前task */
 struct taskInfo *cur_task = NULL;
 /* first_task表示第一个task,也就是优先级最高的task */
@@ -166,7 +166,7 @@ int task_create(task_func task, void *param, int priority, uint32_t timeslice)
     */
     // 开辟任务的结构体
     struct taskInfo *new_task = (struct taskInfo *)malloc(sizeof(struct taskInfo));
-    new_task->task_id = _tasks_num;
+    new_task->task_id = _task_id++;
     new_task->priority = priority;
     new_task->timeslice = timeslice;
     new_task->next = NULL;

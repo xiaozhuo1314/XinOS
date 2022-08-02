@@ -4,18 +4,50 @@
 
 lock_t lock;
 
+/* 软件定时器测试 */
+struct userdata {
+	int counter;
+	char *str;
+};
+struct userdata person = {0, "Jack"};
+void timer_function(void *arg)
+{
+	if (NULL == arg)
+		return;
+
+	struct userdata *param = (struct userdata *)arg;
+
+	param->counter++;
+	printf("======> TIMEOUT: %s: %d\n", param->str, param->counter);
+}
+
 /* 用户任务0 */
 void user_task1(void *param)
 {
     printf("Task 1: Created & Started!\n");
     int cnt = 0;
+    struct timer *t1 = timer_create(timer_function, &person, 3);
+	if (NULL == t1) {
+		printf("timer_create() failed!\n");
+	}
+	struct timer *t2 = timer_create(timer_function, &person, 5);
+	if (NULL == t2) {
+		printf("timer_create() failed!\n");
+	}
+	struct timer *t3 = timer_create(timer_function, &person, 7);
+	if (NULL == t3) {
+		printf("timer_create() failed!\n");
+	}
     while(1)
     {
         printf("Task 1: Running...\n");
         task_delay(DELAY);
-        if((cnt++) > 1)
+        if((cnt++) > 10)
             break;
     }
+    timer_delete(t1);
+    timer_delete(t2);
+    timer_delete(t3);
     task_exit();
 }
 

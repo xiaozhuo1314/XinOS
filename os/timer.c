@@ -3,6 +3,9 @@
 /* 由于CLINT时钟 每秒10000000 ticks,那么经过这些ticks就过了一秒钟 */
 #define TIMER_INTERVAL CLINT_TIMEBASE_FREQ
 
+/* 软件定时器头部指针 */
+struct timer *first_timer = NULL;
+
 static uint32_t _ticks = 0;
 static uint32_t _cur_task_start_tick = 0;
 
@@ -26,9 +29,18 @@ void timer_load(int interval)
     *((uint64_t*)CLIENT_MTIMECMP(hart_id)) = *((uint64_t*)CLIENT_MTIME) + interval;
 }
 
-/* 硬件定时器初始化函数 */
+/* 软件和硬件定时器初始化函数 */
 void timer_init()
 {
+    // 软件定时器初始化
+    struct timer *it = first_timer;
+    while(it)
+    {
+        it->func = NULL;
+        it->args = NULL;
+        it = it->next;
+    }
+
     // mtimecmp寄存器加载ticks,使得1s后触发中断
     timer_load(TIMER_INTERVAL);
 
@@ -87,11 +99,93 @@ void elapsed_time()
     printf("%s\n", times);
 }
 
+/* 
+ * 将定时器插入链表中 
+ * 按照超时时间从小到大排序
+ */
+void insert_timer(struct timer *t)
+{
+    if(!first_timer)
+    {
+        first_timer = t;
+        return;
+    }
+    if(t->timeout < first_timer->timeout)
+    {
+        t->next = first_timer;
+        first_timer = t;
+        return;
+    }
+    struct timer *it = first_timer;
+    struct timer *prev = first_timer;
+    while(it && it->timeout <= t->timeout)
+    {
+        prev = it;
+        it = it->next;
+    }
+    prev->next = t;
+    t->next = it;
+}
+
+/* 软件定时器创建 */
+struct timer *timer_create(timer_func func, void *args, uint32_t timeout)
+{
+    struct timer *t = (struct timer *)malloc(sizeof(struct timer));
+    t->func = func;
+    t->args = args;
+    t->timeout = _ticks + timeout;
+    t->next = NULL;
+    insert_timer(t);
+    return t;
+}
+
+void timer_delete(struct timer *t)
+{
+    struct timer *it = first_timer;
+    if(!it || !t)
+        return;
+    if(t == first_timer)
+    {
+        first_timer = first_timer->next;
+        free((void*)t);
+        return;
+    }
+    struct timer *prev = first_timer;
+    while(it && it != t)
+    {
+        prev = it;
+        it = it->next;
+    }
+    prev->next = it->next;
+    free((void*)t);
+}
+
+/* 检查定时器函数,用于执行超时函数 */
+void timer_check()
+{
+    struct timer *it = first_timer;
+    while(it)
+    {
+        if(it->timeout <= _ticks)
+        {
+            if(it->func != NULL)
+                it->func(it->args);
+        }
+        else
+        {
+            break;
+        }
+        it = it->next;
+    }
+}
+
 /* 硬件定时器中断处理函数 */
 void timer_handler()
 {
     ++_ticks;
     elapsed_time();
+    // 执行软件定时器函数
+    timer_check();
     // 重新设置mtimecmp寄存器清除mip.mtip,并且等待下一个硬件定时器中断
     timer_load(TIMER_INTERVAL);
     // 运行时间已经大于等于任务单次调度能够运行的最大时间了
