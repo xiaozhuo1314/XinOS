@@ -25,7 +25,6 @@ void timer_function(void *arg)
 void user_task1(void *param)
 {
     printf("Task 1: Created & Started!\n");
-    int cnt = 0;
     struct timer *t1 = timer_create(timer_function, &person, 3);
 	if (NULL == t1) {
 		printf("timer_create() failed!\n");
@@ -38,16 +37,12 @@ void user_task1(void *param)
 	if (NULL == t3) {
 		printf("timer_create() failed!\n");
 	}
-    while(1)
-    {
-        printf("Task 1: Running...\n");
-        task_delay(DELAY);
-        if((cnt++) > 10)
-            break;
-    }
+    printf("Task 1: Running...\n");
+    task_delay(10);
     timer_delete(t1);
     timer_delete(t2);
     timer_delete(t3);
+    printf("Task 1: Deleting...\n");
     task_exit();
 }
 
@@ -61,7 +56,7 @@ void user_task2(void *param)
         lock_acquire(&lock);
         printf("Task 2 got lock\n");
         lock_free(&lock);
-        task_delay(DELAY);
+        task_delay(13);
     }
     task_exit();
 }
@@ -76,7 +71,7 @@ void user_task3(void *param)
         lock_acquire(&lock);
         printf("Task 3 got lock\n");
         lock_free(&lock);
-        task_delay(DELAY);
+        task_delay(17);
     }
     task_exit();
 }

@@ -33,7 +33,7 @@ extern void free(void *p);
 /* sched.c */
 extern void sched_init(void);
 extern void schedule(void);
-extern void task_delay(volatile int cnt);
+extern void task_delay(uint32_t tick);
 extern void task_yield(void);
 extern int task_create(task_func task, void *param, int priority, uint32_t timeslice);
 extern void task_exit(void);

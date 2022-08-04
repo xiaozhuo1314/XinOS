@@ -15,13 +15,6 @@ static void w_mscratch(reg_t val)
     asm volatile("csrw mscratch, %0" : : "r"(val));
 }
 
-/* 延时函数,很低级的实现,后续可能会改 */
-void task_delay(volatile int cnt)
-{
-    cnt *= 50000;
-    while(cnt--);
-}
-
 /* 调度初始化 */
 void sched_init()
 {
@@ -30,6 +23,7 @@ void sched_init()
     // 初始化内核任务
     os_task.task_id = 0;
     os_task.priority = 0;
+    os_task.state = RUNNING; // os的任务一直执行,所以一直是RUNNING
     os_task.timeslice = (uint32_t)0xffffffff;
     os_task.next = NULL;
     os_task.ctx.sp = (reg_t)(&(os_stack[STACK_SIZE - 1]));
@@ -80,12 +74,26 @@ struct taskInfo *pop_task()
     if(first_task == NULL)
         return NULL;
     struct taskInfo *task = first_task;
+    struct taskInfo *prev = first_task;
+    while(task && task->state == SLEEPING)
+    {
+        prev = task;
+        task = task->next;
+    }
+    if(task == NULL)
+        return NULL;
+    
     if(task->priority < 256)
         task->priority++; //减小优先级,否则就只能一直高优先级执行了
     
     // 将任务拿出来,降低优先级后再放到任务链表中
-    first_task = first_task->next;
-    --_tasks_num; //减小数量,然后重新插入
+    if(task->task_id == first_task->task_id)
+        first_task = first_task->next;
+    else
+        prev->next = task->next;
+
+    //减小数量,然后重新插入
+    --_tasks_num;
     insert_task(task);
     return task;
 }
@@ -95,14 +103,15 @@ void schedule()
 {
     if(_tasks_num <= 0)
     {
-        panic("Num of task should be greater than zero!");
+        // panic("Num of task should be greater than zero!");
         return;
     }
     // 获取要调度的task Id,下一个执行任务都是当前执行任务的下一个id,不执行的任务都被切换到了内存中
     // 所以这里不会乱,会按照任务的索引依次循环执行
     if((cur_task = pop_task()) == NULL)
     {
-        panic("pop task failed!");
+        back_os();
+        panic("After back_os: never be here");
         return;
     }
     struct context *next = &(cur_task->ctx);
@@ -115,6 +124,14 @@ void task_yield()
     // 抢占式系统中,任务要想主动放弃hart,需要生成软中断
     reg_t hart_id = r_tp();
     *((uint32_t*)CLIENT_MSIP(hart_id)) = 1;
+}
+
+/* 延时函数,很低级的实现,后续可能会改 */
+void task_delay(uint32_t tick)
+{
+    cur_task->state = SLEEPING;
+    timer_create(NULL, NULL, tick);
+    task_yield();
 }
 
 /* 退出任务 */

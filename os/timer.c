@@ -133,6 +133,7 @@ struct timer *timer_create(timer_func func, void *args, uint32_t timeout)
     struct timer *t = (struct timer *)malloc(sizeof(struct timer));
     t->func = func;
     t->args = args;
+    t->task = cur_task;
     t->timeout = _ticks + timeout;
     t->next = NULL;
     insert_timer(t);
@@ -161,15 +162,23 @@ void timer_delete(struct timer *t)
 }
 
 /* 检查定时器函数,用于执行超时函数 */
-void timer_check()
+struct taskInfo *timer_check()
 {
     struct timer *it = first_timer;
     while(it)
     {
         if(it->timeout <= _ticks)
         {
-            if(it->func != NULL)
+            if(it->task->state == SLEEPING && it->func == NULL)
+            {
+                struct taskInfo *task = it->task;
+                timer_delete(it);
+                return task;
+            }
+            else
+            {
                 it->func(it->args);
+            }
         }
         else
         {
@@ -177,6 +186,7 @@ void timer_check()
         }
         it = it->next;
     }
+    return NULL;
 }
 
 /* 硬件定时器中断处理函数 */
@@ -185,9 +195,17 @@ void timer_handler()
     ++_ticks;
     elapsed_time();
     // 执行软件定时器函数
-    timer_check();
+    struct taskInfo *task = timer_check();
+    if(task != NULL)
+    {
+        task->state = RUNNABLE;
+        cur_task = task;
+    }
     // 重新设置mtimecmp寄存器清除mip.mtip,并且等待下一个硬件定时器中断
     timer_load(TIMER_INTERVAL);
+    //如果所有的任务都是睡眠的,那么走到这里cur_task为空,那么此时就直接back_os即可
+    if(cur_task == NULL)
+        back_os();
     // 运行时间已经大于等于任务单次调度能够运行的最大时间了
     // 当前任务在当初选择的时候就已经是优先级最高的任务了,即使选择出来后降低优先级又插回到任务链表中
     if(_ticks - _cur_task_start_tick >= cur_task->timeslice)

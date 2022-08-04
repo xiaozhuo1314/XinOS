@@ -35,10 +35,10 @@ void kernel()
     // 内核任务开始
     while (1)
     {
-        printf("======== OS Starts Next User's Task =====\n");
+        //printf("======== OS Starts Next User's Task =====\n");
         // 开启其中一个用户任务,这样hart就会去执行用户任务,而不会去执行下面的内核语句了
         task_yield(); // 不知道为啥直接调用schedule函数会出现异常
-        printf("===== BACK 2 OS =====\n");
-        task_delay(10000);
+        //printf("===== BACK 2 OS =====\n");
+        //task_delay(10000);
     }
 }

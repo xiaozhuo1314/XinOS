@@ -13,6 +13,12 @@ struct timer
     void *args;
     struct timer *next;
     uint32_t timeout; // 以tick计数
+    /* 
+     * 下面是为了task_delay加上的
+     * 当任务处于sleep状态,说明是主动调用task_delay,所以不去执行func
+     * 当任务处于其他状态,需要去执行func
+    */
+    struct taskInfo *task;
 };
 
 #endif
