@@ -103,6 +103,7 @@ void schedule()
 {
     if(_tasks_num <= 0)
     {
+        back_os();
         // panic("Num of task should be greater than zero!");
         return;
     }
@@ -165,6 +166,8 @@ void task_exit()
 /* 返回内核任务 */
 void back_os()
 {
+    // 写入mstatus的mpp位为machine模式,是的内核代码运行在machine模式
+    w_mstatus(r_mstatus() | 3 << 11);
     switch_to(&(os_task.ctx));
 }
 

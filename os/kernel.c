@@ -1,5 +1,7 @@
 #include "os.h"
 
+extern struct taskInfo *first_task;
+
 void start_kernel(void) {
     // 打印串口初始化
     uart_init();
@@ -37,8 +39,14 @@ void kernel()
     {
         //printf("======== OS Starts Next User's Task =====\n");
         // 开启其中一个用户任务,这样hart就会去执行用户任务,而不会去执行下面的内核语句了
-        task_yield(); // 不知道为啥直接调用schedule函数会出现异常
+
+        // 直接调用schedule函数会由于没有保存os的新的上下文pc而导致出现一直走kernel函数
+        // 在sched_init中设置了os_task的pc为kernel,直接调用schedule函数不会调用reg_store保存此时的pc
+        // 而是继续使用旧上下文的pc,也就是kernel函数,那么就会重复创建同一个user task
+        task_yield();
+
         //printf("===== BACK 2 OS =====\n");
         //task_delay(10000);
+        // schedule();
     }
 }

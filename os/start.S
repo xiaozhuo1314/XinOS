@@ -31,6 +31,16 @@ _start:
     slli t0, t0, 10 # t0 = t0 << 10
     la sp, stacks + STACK_SIZE # sp = stacks + STACK_SIZE
     add sp, sp, t0 # 设置每个hart的sp到达自己的起始位置, stacks + STACK_SIZE + (t0 << 10)
+
+    # 由于在kernel函数中最开始切换任务时,mstatus的值为0,所以此时为user模式,这样直接调用schedule函数会由于操作
+    # mscratch等只有在machine下才能操作的寄存器而出现2号异常,所以需要在刚开始执行的时候就设置mpp为machine模式
+    # 这样在back_os的switch_to函数的mret后,就能一直是machine模式,同时也需要把全局中断打开
+    # mstatue寄存器11和12号mpp位表示的是前一个特权模式,在mret的时候会恢复,mstatus寄存器的7位表示的是全局中断
+    li t0, 3 << 11 | 1 << 7
+    csrr a0, mstatus
+    or t0, t0, a1
+    csrw mstatus, t0
+    
     j start_kernel
 
 park:
