@@ -126,6 +126,7 @@ trap_vector:
 	# 2.传递参数并执行c语言写的trap handler
 	csrr a0, mepc # mepc为第一个参数,即中断或异常处理函数完后的第一条指令
 	csrr a1, mcause # 造成中断或异常的原因
+	csrr a2, mscratch # 造成中断或异常的上下文地址
 	call trap_handler # 执行c语言函数
 	# 3.从trap handler函数返回,并调整mepc
 	csrw mepc, a0

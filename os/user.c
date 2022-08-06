@@ -1,4 +1,5 @@
 #include "os.h"
+#include "user_api.h"
 
 #define DELAY 1000
 
@@ -38,7 +39,7 @@ void user_task1(void *param)
 		printf("timer_create() failed!\n");
 	}
     printf("Task 1: Running...\n");
-    task_delay(10);
+    sleep(10);
     timer_delete(t1);
     timer_delete(t2);
     timer_delete(t3);

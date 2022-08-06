@@ -36,7 +36,7 @@ void software_interrupt_handler()
     schedule();
 }
 
-reg_t trap_handler(reg_t epc, reg_t cause)
+reg_t trap_handler(reg_t epc, reg_t cause, struct context *ctx)
 {
     // 这里传递过来的epc为指令地址,如果是异常那就是产生异常的语句,如果是中断那就是产生中断的语句的下一条语句
     reg_t return_epc = epc;
@@ -65,7 +65,18 @@ reg_t trap_handler(reg_t epc, reg_t cause)
     else //异常
     {
         printf("Sync exceptions!, code = %d\n", cause_code);
-        panic("OOPS! What can I do!");
+        switch (cause_code)
+        {
+        case 8: //本质上系统调用是一个异常
+            uart_puts("System call from user mode\n");
+            do_syscall(ctx);
+            return_epc += 4;
+            break;
+        
+        default:
+            panic("OOPS! What can I do!");
+            break;
+        }
         // 如果不想要panic阻塞住,且想执行产生异常的下一条指令,就可以注释掉上一条panic语句
         // 然后将return_epc加上一个地址跳过产生异常的指令,由于是32位,加4即可
         // return_epc += 4;

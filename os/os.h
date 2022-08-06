@@ -7,6 +7,7 @@
 #include "sched.h"
 #include "lock.h"
 #include "timer.h"
+#include "syscall.h"
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -65,5 +66,8 @@ extern void timer_delete(struct timer *t);
 /* lock.h */
 extern void lock_acquire(lock_t *lock);
 extern void lock_free(lock_t *lock);
+
+/* syscall.c */
+extern void do_syscall(struct context *ctx);
 
 #endif
