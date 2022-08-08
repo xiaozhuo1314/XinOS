@@ -196,14 +196,18 @@ void timer_handler()
     elapsed_time();
     // 执行软件定时器函数
     struct taskInfo *task = timer_check();
-    if(task != NULL)
+    if(task != NULL) //说明是任务sleep到时间了,该进入调度队列了
     {
         task->state = RUNNABLE;
         cur_task = task;
+        timer_load(TIMER_INTERVAL);
+        back_os(); //重新调度
+        return; // never be here
     }
+    // 否则就是没有睡眠的任务或者睡眠的任务还没到时间
     // 重新设置mtimecmp寄存器清除mip.mtip,并且等待下一个硬件定时器中断
     timer_load(TIMER_INTERVAL);
-    //如果所有的任务都是睡眠的,那么走到这里cur_task为空,那么此时就直接back_os即可
+    //如果所有的任务都是睡眠的或者当前没有任务了,那么走到这里cur_task为空,那么此时就直接back_os即可
     if(cur_task == NULL)
         back_os();
     // 运行时间已经大于等于任务单次调度能够运行的最大时间了

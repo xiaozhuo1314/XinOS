@@ -68,6 +68,8 @@ reg_t trap_handler(reg_t epc, reg_t cause, struct context *ctx)
         switch (cause_code)
         {
         case 8: //本质上系统调用是一个异常
+        case 9:
+        case 11:
             uart_puts("System call from user mode\n");
             do_syscall(ctx);
             return_epc += 4;

@@ -39,7 +39,7 @@ void user_task1(void *param)
 		printf("timer_create() failed!\n");
 	}
     printf("Task 1: Running...\n");
-    sleep(10);
+    sleep(1);
     timer_delete(t1);
     timer_delete(t2);
     timer_delete(t3);
@@ -57,7 +57,7 @@ void user_task2(void *param)
         lock_acquire(&lock);
         printf("Task 2 got lock\n");
         lock_free(&lock);
-        task_delay(13);
+        sleep(13);
     }
     task_exit();
 }
@@ -72,7 +72,7 @@ void user_task3(void *param)
         lock_acquire(&lock);
         printf("Task 3 got lock\n");
         lock_free(&lock);
-        task_delay(17);
+        sleep(17);
     }
     task_exit();
 }
@@ -80,7 +80,7 @@ void user_task3(void *param)
 /* 创建所有用户任务函数 */
 void user_init()
 {
-    task_create(user_task1, NULL, 100, 1);
-    task_create(user_task2, NULL, 105, 1);
-    task_create(user_task3, NULL, 110, 1);
+    task_create(user_task1, NULL, 100, 5);
+    task_create(user_task2, NULL, 105, 10);
+    task_create(user_task3, NULL, 110, 10);
 }

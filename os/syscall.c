@@ -13,7 +13,7 @@ void do_syscall(struct context *ctx)
     {
     case SYS_sleep:
         task_delay(ctx->a0);
-        ctx->a0 = 0; // never be here
+        ctx->a0 = 0;
         break;
     default:
         printf("Unknown syscall no: %d\n", call_num);
