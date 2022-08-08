@@ -1,6 +1,7 @@
 #include "os.h"
 
 /* 从mem.S中获取内存每段的位置 */
+#ifdef RV32
 extern uint32_t TEXT_START;
 extern uint32_t TEXT_END;
 extern uint32_t RODATA_START;
@@ -12,6 +13,19 @@ extern uint32_t BSS_END;
 extern uint32_t HEAP_START;
 extern uint32_t HEAP_END;
 extern uint32_t HEAP_SIZE;
+#else
+extern uint64_t TEXT_START;
+extern uint64_t TEXT_END;
+extern uint64_t RODATA_START;
+extern uint64_t RODATA_END;
+extern uint64_t DATA_START;
+extern uint64_t DATA_END;
+extern uint64_t BSS_START;
+extern uint64_t BSS_END;
+extern uint64_t HEAP_START;
+extern uint64_t HEAP_END;
+extern uint64_t HEAP_SIZE;
+#endif
 
 /*
  * 由于在heap的起始位置处需要存放每个页表的管理信息
@@ -21,9 +35,15 @@ extern uint32_t HEAP_SIZE;
  * 又由于每个页为4KB,所以需要32KB / 4KB = 8,也就是8个4K页来存储管理信息
  * 所以实际动态分配内存的起始地址为：HEAP_START + 所有管理信息的大小 = HEAP_START + 8 * 4K
  */
+#ifdef RV32
 static uint32_t _alloc_start = 0;
 static uint32_t _alloc_end = 0;
 static uint32_t _num_pages = 0;
+#else
+static uint64_t _alloc_start = 0;
+static uint64_t _alloc_end = 0;
+static uint64_t _num_pages = 0;
+#endif
 
 #define PAGE_SIZE 4096
 
@@ -90,11 +110,19 @@ static inline void _clear_page(struct Page *page) {
 }
 
 /* 对齐函数 */
+#ifdef RV32
 static inline uint32_t _align_page(uint32_t addr)
 {
     uint32_t order = (1 << PAGE_ORDER) - 1;
     return ((addr + order) & (~order));
 }
+#else
+static inline uint64_t _align_page(uint64_t addr)
+{
+    uint64_t order = (1 << PAGE_ORDER) - 1;
+    return ((addr + order) & (~order));
+}
+#endif
 
 /* 判断页是否是空闲的 */
 static inline int _is_page_free(struct Page *page)
@@ -135,7 +163,11 @@ static inline void *_get_start_mem_by_page(struct Page *page)
 /* 通过地址获取页内存的初始位置 */
 static inline void *_get_start_mem_by_addr(void *p)
 {
+#ifdef RV32
     uint32_t page_count = ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+#else
+    uint64_t page_count = ((uint64_t)p - _alloc_start) / PAGE_SIZE;
+#endif
     return (void*)(_alloc_start + page_count * PAGE_SIZE);
 }
 
@@ -143,7 +175,11 @@ static inline void *_get_start_mem_by_addr(void *p)
 static inline struct Page *_get_page_by_addr(void *p)
 {
     p = _get_start_mem_by_addr(p);
+#ifdef RV32
     uint32_t page_count = ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+#else
+    uint64_t page_count = ((uint64_t)p - _alloc_start) / PAGE_SIZE;
+#endif
     return ((struct Page*)HEAP_START + page_count);
 }
 
@@ -227,9 +263,15 @@ void *page_alloc(int npages)
 /* 按页释放内存 */
 void page_free(void *p)
 {
+#ifdef RV32
     if(!p || (uint32_t)p >= _alloc_end || (uint32_t)p < _alloc_start) return;
 
     struct Page *page = (struct Page *)HEAP_START + ((uint32_t)p - _alloc_start) / PAGE_SIZE;
+#else
+    if(!p || (uint64_t)p >= _alloc_end || (uint64_t)p < _alloc_start) return;
+
+    struct Page *page = (struct Page *)HEAP_START + ((uint64_t)p - _alloc_start) / PAGE_SIZE;
+#endif
 
     // 若是分配了几页连续的内存A,然后从中间的某个位置B开始 page_free,然后下一次从B开始分配新区域
     // 此时再去page_free掉A剩下的,由于此时剩下的A中的最后一页没有PAGE_LAST标志,那么就会连同B新分配的一起free了
@@ -238,8 +280,13 @@ void page_free(void *p)
     {
         struct Page *prev_page = page - 1;
         void *prev = _get_start_mem_by_page(prev_page);
+#ifdef RV32
         if((uint32_t)prev >= _alloc_start && !_is_page_free(prev_page))
             _set_page_flags(prev_page, PAGE_LAST);
+#else
+        if((uint64_t)prev >= _alloc_start && !_is_page_free(prev_page))
+            _set_page_flags(prev_page, PAGE_LAST);
+#endif
     }
 
     while(!_is_page_free(page))
@@ -495,11 +542,19 @@ void *malloc(size_t size)
 
 void free(void *p)
 {
+#ifdef RV32
     if(p == NULL || (uint32_t)p < _alloc_start || (uint32_t)p > _alloc_end)
     {
         panic("Memory panic: Can't free this memory");
          return;
     }
+#else
+    if(p == NULL || (uint64_t)p < _alloc_start || (uint64_t)p > _alloc_end)
+    {
+        panic("Memory panic: Can't free this memory");
+         return;
+    }
+#endif
     // 获取p所在的页
     struct Page *page = _get_page_by_addr(p);
     /* 
@@ -548,8 +603,13 @@ void free(void *p)
         if(!_is_block_first(block))
         {
             struct Block *prev_block = block - 1;
+#ifdef RV32
             if((uint32_t)prev_block >= (uint32_t)block_start && !_is_block_free(prev_block))
                 _set_block_flags(prev_block, BLOCK_LAST);
+#else
+            if((uint64_t)prev_block >= (uint64_t)block_start && !_is_block_free(prev_block))
+                _set_block_flags(prev_block, BLOCK_LAST);
+#endif
         }
 
         while(!_is_block_free(block))
@@ -584,11 +644,19 @@ void free(void *p)
 
 void *memcpy(void *dest, const void *src, size_t n)
 {
+#ifdef RV32
     if((uint32_t)dest < _alloc_start || ((uint32_t)dest + n) > _alloc_end)
     {
         panic("Memcpy Panic: destination oversteps the boundary");
         return NULL;
     }
+#else
+    if((uint64_t)dest < _alloc_start || ((uint64_t)dest + n) > _alloc_end)
+    {
+        panic("Memcpy Panic: destination oversteps the boundary");
+        return NULL;
+    }
+#endif
     if(dest == src)
         return dest;
 

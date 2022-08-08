@@ -1,8 +1,20 @@
 CROSS_COMPILE = riscv64-unknown-elf-
-CFLAGS = -nostdlib -fno-builtin -march=rv32ima -mabi=ilp32 -g -Wall
 
-QEMU = qemu-system-riscv32
+CFLAGS32 = -nostdlib -fno-builtin -march=rv32ima -mabi=ilp32 -g -Wall -D RV32
+CFLAGS64 = -nostdlib -fno-builtin -march=rv64ima -mabi=lp64 -g -Wall -mcmodel=medany -D RV64
+CFLAGS := ${CFLAGS64} #默认64位
+
+QEMU32 = qemu-system-riscv32
+QEMU64 = qemu-system-riscv64
+QEMU := ${QEMU64} #默认64位
 QFLAGS = -nographic -smp 1 -machine virt -bios none
+
+ifeq (${arch}, rv32)
+CFLAGS := ${CFLAGS32}
+QEMU := ${QEMU32}
+else
+arch := rv64
+endif
 
 GDB = gdb-multiarch
 CC = ${CROSS_COMPILE}gcc

@@ -40,8 +40,8 @@ reg_t trap_handler(reg_t epc, reg_t cause, struct context *ctx)
 {
     // 这里传递过来的epc为指令地址,如果是异常那就是产生异常的语句,如果是中断那就是产生中断的语句的下一条语句
     reg_t return_epc = epc;
-    reg_t cause_code = cause & 0xfff;
-    if(cause & 0x80000000) //如果是中断,因为mcause寄存器最高位为1代表中断,为0表示异常
+    reg_t cause_code = cause & (~(1 << (MXLEN - 1)));
+    if(cause & (1 << (MXLEN - 1))) //如果是中断,因为mcause寄存器最高位为1代表中断,为0表示异常
     {
         switch (cause_code)
         {

@@ -1,7 +1,11 @@
 #include "platform.h"
 
-    # 设置每个hart的栈大小为1024
+    # 设置每个hart的栈大小为1024或2048
+#ifdef RV32
     .equ STACK_SIZE, 1024
+#else
+	.equ STACK_SIZE, 4096
+#endif
 
     .global _start
 
@@ -28,7 +32,11 @@ _start:
     # 所以每个hart的栈的起始位置为stacks + (t0 + 1) * STACK_SIZE
     # 加1是因为栈从高地址往低地址生长,所以初始位置在每个hart栈的高地址处,需要再加一个STACK_SIZE
     # 也就是stacks + STACK_SIZE + (t0 << 10)
+#ifdef RV32
     slli t0, t0, 10 # t0 = t0 << 10
+#else
+	slli t0, t0, 11
+#endif
     la sp, stacks + STACK_SIZE # sp = stacks + STACK_SIZE
     add sp, sp, t0 # 设置每个hart的sp到达自己的起始位置, stacks + STACK_SIZE + (t0 << 10)
 

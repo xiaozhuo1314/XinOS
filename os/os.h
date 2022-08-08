@@ -34,9 +34,17 @@ extern void free(void *p);
 /* sched.c */
 extern void sched_init(void);
 extern void schedule(void);
+#ifdef RV32
 extern void task_delay(uint32_t tick);
+#else
+extern void task_delay(uint64_t tick);
+#endif
 extern void task_yield(void);
+#ifdef RV32
 extern int task_create(task_func task, void *param, int priority, uint32_t timeslice);
+#else
+extern int task_create(task_func task, void *param, int priority, uint64_t timeslice);
+#endif
 extern void task_exit(void);
 extern void back_os(void);
 
@@ -60,7 +68,11 @@ extern void timer_load(int interval);
 extern void timer_init(void);
 extern void timer_handler(void); 
 extern void timer_init(void);
+#ifdef RV32
 extern struct timer *timer_create(timer_func func, void *args, uint32_t timeout);
+#else
+extern struct timer *timer_create(timer_func func, void *args, uint64_t timeout);
+#endif
 extern void timer_delete(struct timer *t);
 
 /* lock.h */

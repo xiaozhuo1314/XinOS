@@ -7,6 +7,10 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 
 /* 32位寄存器 */
+#ifdef RV32
 typedef uint32_t reg_t;
+#else
+typedef uint64_t reg_t;
+#endif
 
 #endif

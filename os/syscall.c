@@ -8,7 +8,11 @@
  */
 void do_syscall(struct context *ctx)
 {
+#ifdef RV32
     uint32_t call_num = ctx->a7;
+#else
+    uint64_t call_num = ctx->a7;
+#endif
     switch (call_num)
     {
     case SYS_sleep:

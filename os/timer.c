@@ -6,8 +6,13 @@
 /* 软件定时器头部指针 */
 struct timer *first_timer = NULL;
 
+#ifdef RV32
 static uint32_t _ticks = 0;
 static uint32_t _cur_task_start_tick = 0;
+#else
+static uint64_t _ticks = 0;
+static uint64_t _cur_task_start_tick = 0;
+#endif
 
 // sched.c中的当前任务
 extern struct taskInfo *cur_task;
@@ -54,10 +59,17 @@ void timer_init()
 /* 显示系统从开机到现在运行时间 */
 void elapsed_time()
 {
+#ifdef RV32
     uint32_t seconds = _ticks % 60;
     uint32_t tmp = _ticks / 60;
     uint32_t minutes = tmp % 60;
     uint32_t hours = tmp / 60;
+#else
+    uint64_t seconds = _ticks % 60;
+    uint64_t tmp = _ticks / 60;
+    uint64_t minutes = tmp % 60;
+    uint64_t hours = tmp / 60;
+#endif
     char times[24] = {0};
     int idx = 0;
     // 小时
@@ -128,6 +140,7 @@ void insert_timer(struct timer *t)
 }
 
 /* 软件定时器创建 */
+#ifdef RV32
 struct timer *timer_create(timer_func func, void *args, uint32_t timeout)
 {
     struct timer *t = (struct timer *)malloc(sizeof(struct timer));
@@ -139,6 +152,19 @@ struct timer *timer_create(timer_func func, void *args, uint32_t timeout)
     insert_timer(t);
     return t;
 }
+#else
+struct timer *timer_create(timer_func func, void *args, uint64_t timeout)
+{
+    struct timer *t = (struct timer *)malloc(sizeof(struct timer));
+    t->func = func;
+    t->args = args;
+    t->task = cur_task;
+    t->timeout = _ticks + timeout;
+    t->next = NULL;
+    insert_timer(t);
+    return t;
+}
+#endif
 
 void timer_delete(struct timer *t)
 {

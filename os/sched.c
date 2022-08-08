@@ -24,7 +24,7 @@ void sched_init()
     os_task.task_id = 0;
     os_task.priority = 0;
     os_task.state = RUNNING; // os的任务一直执行,所以一直是RUNNING
-    os_task.timeslice = (uint32_t)0xffffffff;
+    os_task.timeslice = 0xffffffff;
     os_task.next = NULL;
     os_task.ctx.sp = (reg_t)(&(os_stack[STACK_SIZE - 1]));
     os_task.ctx.pc = (reg_t)kernel; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc
@@ -128,12 +128,21 @@ void task_yield()
 }
 
 /* 延时函数,很低级的实现,后续可能会改 */
+#ifdef RV32
 void task_delay(uint32_t tick)
 {
     cur_task->state = SLEEPING;
     timer_create(NULL, NULL, tick);
     task_yield();
 }
+#else
+void task_delay(uint64_t tick)
+{
+    cur_task->state = SLEEPING;
+    timer_create(NULL, NULL, tick);
+    task_yield();
+}
+#endif
 
 /* 退出任务 */
 void task_exit()
@@ -175,6 +184,7 @@ void back_os()
  * 任务创建函数
  * 参数为待执行任务的第一条指令的地址,所带的参数,任务优先级
  */
+#ifdef RV32
 int task_create(task_func task, void *param, int priority, uint32_t timeslice)
 {
     if(_tasks_num >= MAX_TASK_NUM)
@@ -203,3 +213,33 @@ int task_create(task_func task, void *param, int priority, uint32_t timeslice)
     }
     return 0;
 }
+#else
+int task_create(task_func task, void *param, int priority, uint64_t timeslice)
+{
+    if(_tasks_num >= MAX_TASK_NUM)
+        return -1;
+    /* 
+     * 将任务的信息填写到结构体中
+     * 第任务执行只需要ra指向下一条指令的地址,sp指向对应的栈即可
+     * 必须要有栈是因为任务不可能很简单,以后会需要调用函数之类的,需要栈来实现
+    */
+    // 开辟任务的结构体
+    struct taskInfo *new_task = (struct taskInfo *)malloc(sizeof(struct taskInfo));
+    new_task->task_id = _task_id++;
+    new_task->priority = priority;
+    new_task->timeslice = timeslice;
+    new_task->next = NULL;
+    new_task->ctx.sp = (reg_t)(&(task_stack[_tasks_num][STACK_SIZE - 1]));
+    new_task->ctx.pc = (reg_t)task; // 由于switch_to函数不用ret而是用mret,所以这里得需要改成pc
+    if(param != NULL)
+        new_task->ctx.a0 = (reg_t)param;
+    // 插入新任务到任务链表中
+    if(insert_task(new_task) < 0)
+    {
+        printf("插入任务失败\n");
+        free((void *)new_task);
+        return -1;
+    }
+    return 0;
+}
+#endif

@@ -3,6 +3,7 @@
 
 # 保存寄存器值到内存中,base为所要保存到的内存中的目的地址
 .macro reg_save base
+#ifdef RV32
     # 这里还有个x0寄存器没有保存,由x0寄存器的值一直是0,所以不需要保存
     sw ra, 0(\base)
 	sw sp, 4(\base)
@@ -37,9 +38,42 @@
     # 其实还有一个寄存器t6,但是这里没有保存,因为在reg_save函数中base就是t6寄存器
     # 所以t6寄存器的值需要在外部的switch_to函数中保存到mscratch寄存器中
     # 然后在switch_to函数中将t6保存到t5的后面
+#else
+	sd ra, 0(\base)
+	sd sp, 8(\base)
+	sd gp, 16(\base)
+	sd tp, 24(\base)
+	sd t0, 32(\base)
+	sd t1, 40(\base)
+	sd t2, 48(\base)
+	sd s0, 56(\base)
+	sd s1, 64(\base)
+	sd a0, 72(\base)
+	sd a1, 80(\base)
+	sd a2, 88(\base)
+	sd a3, 96(\base)
+	sd a4, 104(\base)
+	sd a5, 112(\base)
+	sd a6, 120(\base)
+	sd a7, 128(\base)
+	sd s2, 136(\base)
+	sd s3, 144(\base)
+	sd s4, 152(\base)
+	sd s5, 160(\base)
+	sd s6, 168(\base)
+	sd s7, 176(\base)
+	sd s8, 184(\base)
+	sd s9, 192(\base)
+	sd s10, 200(\base)
+	sd s11, 208(\base)
+	sd t3, 216(\base)
+	sd t4, 224(\base)
+	sd t5, 232(\base)
+#endif
 .endm
 
 .macro reg_restore base
+#ifdef RV32
     # 这里还有个a0寄存器没有载入,由于a0寄存器的值一直是0,所以不需要载入
     lw ra, 0(\base)
 	lw sp, 4(\base)
@@ -72,6 +106,38 @@
 	lw t4, 112(\base)
 	lw t5, 116(\base)
 	lw t6, 120(\base)
+#else
+	ld ra, 0(\base)
+	ld sp, 8(\base)
+	ld gp, 16(\base)
+	ld tp, 24(\base)
+	ld t0, 32(\base)
+	ld t1, 40(\base)
+	ld t2, 48(\base)
+	ld s0, 56(\base)
+	ld s1, 64(\base)
+	ld a0, 72(\base)
+	ld a1, 80(\base)
+	ld a2, 88(\base)
+	ld a3, 96(\base)
+	ld a4, 104(\base)
+	ld a5, 112(\base)
+	ld a6, 120(\base)
+	ld a7, 128(\base)
+	ld s2, 136(\base)
+	ld s3, 144(\base)
+	ld s4, 152(\base)
+	ld s5, 160(\base)
+	ld s6, 168(\base)
+	ld s7, 176(\base)
+	ld s8, 184(\base)
+	ld s9, 192(\base)
+	ld s10, 200(\base)
+	ld s11, 208(\base)
+	ld t3, 216(\base)
+	ld t4, 224(\base)
+	ld t5, 232(\base)
+#endif
 .endm
 
     .text
@@ -118,10 +184,18 @@ trap_vector:
 	reg_save t6 # 保存时还有个原来的t6寄存器值没有保存,此时需要去保存
 	mv t5, t6 # 保存上下文内存地址,用于后面保存t6原有的值
 	csrr t6, mscratch # 恢复t6的值
+#ifdef RV32
 	sw t6, 120(t5) # 保存t6的值
+#else
+	sd t6, 240(t5)
+#endif
 	# 抢占式任务需要保存pc的值到内存中,由于在trap的top half中已经将pc的值保存到了mepc中了,所以这里需要保存mepc即可
 	csrr a0, mepc
+#ifdef RV32
 	sw a0, 124(t5) # 保存mepc的值
+#else
+	sd a0, 248(t5)
+#endif
 	csrw mscratch, t5 # 将上下文地址恢复到mscratch
 	# 2.传递参数并执行c语言写的trap handler
 	csrr a0, mepc # mepc为第一个参数,即中断或异常处理函数完后的第一条指令
@@ -158,7 +232,11 @@ switch_to:
     # 用于将传递过来的新结构体context的地址放到mscratch寄存器中,并将新结构体载入到各个寄存器中
     csrw mscratch, a0
 	# 将a0指向的结构体中的pc值恢复给mepc
+#ifdef RV32
 	lw a1, 124(a0)
+#else
+	ld a1, 248(a0)
+#endif
 	csrw mepc, a1
     # t6要作为reg_restore的参数,也就是t6保存的是新结构体context的地址,也就是a0中的值
     mv t6, a0

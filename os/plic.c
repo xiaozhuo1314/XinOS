@@ -10,8 +10,8 @@ void plic_init()
     *((uint32_t*)(PLIC_PRIORITY(UART0_IRQ))) = 1;
 
     // 设置uart代表的中断源开启,每个中断源对应的plic寄存器中的某一二进制位,而plic在hart上是地址映射
-    uint64_t plic_menable = *((uint64_t*)(PLIC_MENABLE(hart_id)));
-    *((uint64_t*)(PLIC_MENABLE(hart_id))) = plic_menable | (1 << UART0_IRQ);
+    uint32_t plic_menable = *((uint32_t*)(PLIC_MENABLE(hart_id)));
+    *((uint32_t*)(PLIC_MENABLE(hart_id))) = plic_menable | (1 << UART0_IRQ);
 
     // 设置阈值
     *((uint32_t*)(PLIC_MTHRESHOLD(hart_id))) = 0;

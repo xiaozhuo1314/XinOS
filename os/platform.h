@@ -1,6 +1,9 @@
 #ifndef __PLATFORM_H__
 #define __PLATFORM_H__
 
+/* 寄存器长度 */
+#define MXLEN 32
+
 /* cpu个数 */
 #define MAXNUM_CPU 8
 
