@@ -4,7 +4,7 @@
 ; 本文件就是内核加载器的程序
 ; 这里我们人为设置了内核加载器起始位置的字节是0x55aa
 ; 如果后续判断的时候该位置处不是0x55aa , 那么就是错误的
-dd 0x55aa
+dw 0x55aa
 
 mov si, loading
 call print
@@ -46,7 +46,6 @@ detect_memory:
 ; 然后我们这里其实只用两个就可以了, 一个描述符描述代码段, 另一个描述符描述数据段
 ; 也就是下面的gdt_code和gdt_data
 prepare_protected_mode:
-    xchg bx, bx
     ; 关闭中断
     cli
     ; 打开A20线
@@ -88,7 +87,6 @@ error:
 
 [bits 32]  ; 已经到了32位
 protect_mode:
-    xchg bx, bx
     ; 初始化段寄存器为数据段选择子
     mov ax, data_selector
     mov ds, ax
@@ -96,13 +94,87 @@ protect_mode:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    xchg bx, bx
     ; 修改栈顶, 0x10000是要在可用区域, 也就是操作系统加载的位置
     mov esp, 0x10000
-    ; 保护模式后可以修改1M以外的内存
-    mov byte [0xb8000], 'P'
-    mov byte [0x200000], 'P'
-jmp $
+    mov edi, 0x10000; 读取的目标内存
+    mov ecx, 10; 内核加载器的起始扇区, 要跟dd命令对应
+    mov bl, 200; 内核加载器的扇区数量, 要跟dd命令对应
+    call read_disk
+
+    ; 跳转到内核开始处_start
+    jmp dword code_selector:0x10000
+    ; ud2表示出错
+    ud2
+
+; 读取磁盘
+read_disk:
+    ; 设置读写扇区的数量
+    mov dx, 0x1f2
+    mov al, bl
+    out dx, al
+
+    inc dx; 0x1f3
+    mov al, cl; 起始扇区的前八位
+    out dx, al
+
+    inc dx; 0x1f4
+    shr ecx, 8
+    mov al, cl; 起始扇区的中八位
+    out dx, al
+
+    inc dx; 0x1f5
+    shr ecx, 8
+    mov al, cl; 起始扇区的高八位
+    out dx, al
+
+    inc dx; 0x1f6
+    shr ecx, 8
+    and cl, 0b1111; 将高四位置为 0
+
+    mov al, 0b1110_0000;
+    or al, cl
+    out dx, al; 主盘 - LBA 模式
+
+    inc dx; 0x1f7
+    mov al, 0x20; 读硬盘
+    out dx, al
+
+    xor ecx, ecx; 将 ecx 清空
+    mov cl, bl; 得到读写扇区的数量
+
+    .read:
+        push cx; 保存 cx
+        call .waits; 等待数据准备完毕
+        call .reads; 读取一个扇区
+        pop cx; 恢复 cx
+        loop .read
+
+    ret
+
+    .waits:
+        mov dx, 0x1f7
+        .check:
+            in al, dx
+            jmp $+2; nop 直接跳转到下一行
+            jmp $+2; 一点点延迟
+            jmp $+2
+            and al, 0b1000_1000
+            cmp al, 0b0000_1000
+            jnz .check
+        ret
+
+    .reads:
+        mov dx, 0x1f0
+        mov cx, 256; 一个扇区 256 字
+        .readw:
+            in ax, dx
+            jmp $+2; 一点点延迟
+            jmp $+2
+            jmp $+2
+            mov [edi], ax
+            add edi, 2
+            loop .readw
+        ret
 
 ; 代码段和数据段选择子
 code_selector equ (1 << 3)  ; 下标为1的是代码段选择子, 前三位不是下标值
