@@ -67,4 +67,4 @@ clean:
 
 .PHONY: bochs
 bochs: $(BUILD)/master.img
-	bochs -q
+	/home/silence/Desktop/XinOS/bochs/bochs/bin/bochs-gdb -q -f /home/silence/Desktop/XinOS/bochs/bochs/bin/bochsrc.gdb

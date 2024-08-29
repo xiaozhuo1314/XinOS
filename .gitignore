@@ -1,0 +1,7 @@
+bochs/
+.vscode/
+*.bin
+*.img
+*.out
+*.o
+*.map
