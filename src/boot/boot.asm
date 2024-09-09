@@ -1,41 +1,35 @@
-[org 0x7c00] ;本程序在内存中的位置, bios会跳转到这个位置
+[org 0x7c00]
 
-mov ax, 3 ;设置屏幕为文本模式
-int 0x10 ;bios中断, 会根据ax的值选择不同的调用程序, 当ax=3时, 会输出80*25分辨率的文字, 颜色为16
+; 设置屏幕模式为文本模式，清除屏幕
+mov ax, 3
+int 0x10
 
 ; 初始化段寄存器
 mov ax, 0
 mov ds, ax
 mov es, ax
 mov ss, ax
-mov sp, 0x7c00 ;将栈指针指向0x7c00
-
-;0xB8000 - 0xBFFFF共32KB, 是文本显示器的内存区域, 而实模式下寻址是ds<<4 + 16位偏移地址
-; 因此ds应该设置成0xb800, 偏移地址为0
-;mov ax, 0xb800
-;mov ds, ax  ;设置段寄存器为0xb800
-;mov byte ds:[0], 'H'  ; 偏移地址设置为了0, 就是[0]中的0
+mov sp, 0x7c00
 
 mov si, booting
 call print
 
 mov edi, 0x1000; 读取的目标内存
-mov ecx, 2; 内核加载器的起始扇区, 要跟dd命令对应
-mov bl, 4; 内核加载器的扇区数量, 要跟dd命令对应
+mov ecx, 2; 起始扇区
+mov bl, 4; 扇区数量
 
 call read_disk
 
-; 比较0x1000是否是0x55aa, ds是数据段寄存器
-cmp word ds:[0x1000], 0x55aa
+cmp word [0x1000], 0x55aa
 jnz error
-; 否则就跳转到代码段的0x1002的位置
-; 也就是跳过loader的前两个魔数
+
 jmp 0:0x1002
 
 ; 阻塞
 jmp $
 
 read_disk:
+
     ; 设置读写扇区的数量
     mov dx, 0x1f2
     mov al, bl
@@ -117,20 +111,18 @@ print:
     ret
 
 booting:
-    db "Booting XinOS...", 10, 13, 0; \n\r
+    db "Booting Onix...", 10, 13, 0; \n\r
 
 error:
     mov si, .msg
     call print
-    hlt ; 让cpu停止
+    hlt; 让 CPU 停止
     jmp $
-    .msg db "Booting Error!!!", 10, 13, 0; \n\r
+    .msg db "Booting Error!!!", 10, 13, 0
 
-;由于主引导程序得有512字节, 最后的两个字节是两个魔数, 因此就要求到这一行语句的时候得有510个字节,
-;所以这里就使用0填充
-; 512字节分为代码446B, 硬盘分区表有64B=4*16B, 也就是最多有4个主分区, 最后两个是魔数
-; $表示当前位置, $$表示开头位置, $ - $$表示从开头到这里有多少字节的数据
+; 填充 0
 times 510 - ($ - $$) db 0
 
-;bios要求主引导程序的512字节的最后两个字节是0x55aa
+; 主引导扇区的最后两个字节必须是 0x55 0xaa
+; dw 0xaa55
 db 0x55, 0xaa

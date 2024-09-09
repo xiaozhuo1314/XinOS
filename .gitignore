@@ -5,3 +5,6 @@ bochs/
 *.out
 *.o
 *.map
+build/master.img.lock
+.gitignore
+src/bx_enh_dbg.ini

@@ -43,7 +43,7 @@
  */
 static u32 screen;
 static u32 pos;
-static x, y;                             // 当前光标的坐标, 不是内存中的位置, 而是当前屏幕上的坐标
+static int x, y;                             // 当前光标的坐标, 不是内存中的位置, 而是当前屏幕上的坐标
 static u8 attr = 7;                  // 字符样式
 static u16 erase = 0x0720;    // 带有样式的空格, 因为前一个字节是字符空格0x20, 后一个字节是样式0x07, 而从第一个字符开始的内存地址是增长的, 所以0x07是在高位的
 
@@ -104,7 +104,7 @@ void console_clear() {
 
     // 由于mem_base到mem_end之间可能刚才写了一些字符, 此时需要设置为空格
     u16 *ptr = (u16*)MEM_BASE;
-    while(ptr < MEM_END) {
+    while(ptr < (u16*)MEM_END) {
         *ptr++ = erase;
     }
 }
@@ -140,7 +140,7 @@ static void command_cr() {
 static void scroll_up() {
     if(screen + SCR_SIZE + ROW_SIZE >= MEM_END) {
         // 由于此时没有内存了, 就需要将当前屏幕上的内容拷贝到内存开始位置
-        memcpy(MEM_BASE, screen, SCR_SIZE);
+        memcpy((void*)MEM_BASE, (void*)screen, SCR_SIZE);
         pos -= (screen - MEM_BASE);
         screen = MEM_BASE;
         // 重新获取此时的x和y
