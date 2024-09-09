@@ -40,6 +40,7 @@ $(BUILD)/%.o: $(SRC)/%.c
 $(BUILD)/kernel.bin: $(BUILD)/kernel/start.o \
 	$(BUILD)/kernel/main.o \
 	$(BUILD)/kernel/io.o \
+	$(BUILD)/kernel/schedule.o \
 	$(BUILD)/kernel/console.o \
 	$(BUILD)/kernel/assert.o \
 	$(BUILD)/kernel/debug.o \
