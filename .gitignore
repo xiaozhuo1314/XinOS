@@ -8,3 +8,4 @@ bochs/
 build/master.img.lock
 .gitignore
 src/bx_enh_dbg.ini
+bochs-2.8.tar.gz
