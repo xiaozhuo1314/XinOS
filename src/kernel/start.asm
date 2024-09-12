@@ -6,4 +6,6 @@ extern kernel_init
 global _start
 _start:
     call kernel_init
+    ; 调用中断处理函数
+    int 0x80
     jmp $

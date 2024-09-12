@@ -6,11 +6,13 @@
 #include "xinos/debug.h"
 #include "xinos/global.h"
 #include "xinos/task.h"
+#include "xinos/interrupt.h"
 
 char msg[] = "hello xinos\n";
 
 void kernel_init() {
     console_init();
     gdt_init();
-    task_init();
+    // task_init();
+    interrupt_init();
 }

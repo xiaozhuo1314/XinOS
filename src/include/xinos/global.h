@@ -12,17 +12,17 @@
  */
 typedef struct descriptor_t {
     unsigned short limit_low;          // 段界限 0-15位
-    unsigned int base_low : 24;        // 基地址的低24位, 0-23位
-    unsigned char type : 4;            // 段类型
-    unsigned char segment : 1;         // 1表示代码段或数据段, 0表示系统段
+    unsigned int base_low : 24;       // 基地址的低24位, 0-23位
+    unsigned char type : 4;              // 段类型
+    unsigned char segment : 1;        // 1表示代码段或数据段, 0表示系统段
     unsigned char DPL : 2;             // 描述符特权等级 0-3级
     unsigned char present : 1;         // 存在位, 1表示在内存中, 0表示在磁盘上
-    unsigned char limit_high : 4;      // 段界限 16-19位
-    unsigned char available : 1;       // 操作系统自定义作用
-    unsigned char long_mode : 1;       // 64位扩展标志
-    unsigned char big : 1;             // 32位还是16位
-    unsigned char granularity : 1;     // 粒度是4K还是1B
-    unsigned char base_high;           // 基地址的高8位
+    unsigned char limit_high : 4;    // 段界限 16-19位
+    unsigned char available : 1;      // 操作系统自定义作用
+    unsigned char long_mode : 1;   // 64位扩展标志
+    unsigned char big : 1;               // 32位还是16位
+    unsigned char granularity : 1;   // 粒度是4K还是1B
+    unsigned char base_high;         // 基地址的高8位
 } _packed descriptor_t;
 
 
@@ -30,8 +30,8 @@ typedef struct descriptor_t {
  * 段选择子
  */
 typedef struct selector_t {
-    u8 RPL : 2;                        // 请求特权级, 即用什么权限来请求
-    u8 TI : 1;                         // 0表示全局描述符表, 1表示局部描述符表
+    u8 RPL : 2;                          // 请求特权级, 即用什么权限来请求
+    u8 TI : 1;                             // 0表示全局描述符表, 1表示局部描述符表
     u16 index : 13;                    // 索引值, 该值*8(描述符占8字节)+(全局或者局部)描述符表的基地址, 就是要加载的段描述符
 } _packed selector_t;
 
