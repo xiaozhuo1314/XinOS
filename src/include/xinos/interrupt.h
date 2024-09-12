@@ -21,6 +21,9 @@ typedef struct gate_t
     u16 offset1;                  // 当前描述符所指向的中断处理函数, 在段内偏移地址的16-31位
 } _packed gate_t;
 
+// 中断处理函数
+typedef void *handler_t;
+
 void interrupt_init();
 
 #endif
