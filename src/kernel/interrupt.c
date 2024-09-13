@@ -57,6 +57,8 @@ static char *messages[] = {
     "#CP Control Protection Exception\0",
 };
 
+extern void schedule();
+
 /**
  * 通知中断控制器中断处理结束了
  * vector: 外部中断向量
@@ -75,22 +77,50 @@ u32 counter = 0;
  * 默认中断处理函数
 */
 void default_handler(int vector) {
+    /**
+     * 这里要先通知中断处理器中断处理完成了
+     * 这样中断处理器就可以重新生成中断了
+     * 但是生成了不代表就能被cpu响应
+     * 因为此时eflags中的if位还是位0, 此时只能响应不可屏蔽的中断, 例如定时器等硬件中断
+     * 很多软中断就被屏蔽了
+     * 
+     * 如果这里先schedule的话, 因为task中是死循环, 就无法执行到send_eoi
+     * 即使task中设置了if位为1, 由于中断处理器中还是屏蔽状态, 就无法响应了
+     * 所以要先send_eoi, 然后schedule
+     * 
+     * 因此刚上来程序执行taska, 然后来了中断执行taskb
+     * 但是由于是先执行schedule, 并没有通知中断控制器要响应中断
+     * 因此此时就无法再通过中断调用到taska了
+    */
     send_eoi(vector);
-    LOGK("[%d] default interrupt called %d...\n", vector, counter++);
+    schedule();
 }
 
 /**
  * 异常处理函数
  * vector为异常向量, 也就是handler.asm中的%1
+ * 后面都是我们pusha和push gs等压入的寄存器信息
  */
-void exception_handler(int vector) {
+void exception_handler(
+    int vector,
+    u32 edi, u32 esi, u32 ebp, u32 esp,
+    u32 ebx, u32 edx, u32 ecx, u32 eax,
+    u32 gs, u32 fs, u32 es, u32 ds,
+    u32 vector0, u32 error, u32 eip, u32 cs, u32 eflags) 
+{
     char *msg = NULL;
 
     if(vector < 22) msg = messages[vector];
     else msg = messages[15];  // 默认的
 
     // 输出异常信息
-    printk("Exception : [0x%02X] %s \n", vector, msg);
+    printk("\nEXCEPTION : %s \n", messages[vector]);
+    printk("   VECTOR : 0x%02X\n", vector);
+    printk("    ERROR : 0x%08X\n", error);
+    printk("   EFLAGS : 0x%08X\n", eflags);
+    printk("       CS : 0x%02X\n", cs);
+    printk("      EIP : 0x%08X\n", eip);
+    printk("      ESP : 0x%08X\n", esp);
     // 阻塞
     hang();
     // 阻塞如果完成就是出错了
@@ -111,7 +141,7 @@ void pic_init() {
     outb(PIC_S_DATA, 2);          // ICW3: 设置从片连接到主片的 IR2 引脚
     outb(PIC_S_DATA, 0b00000001); // ICW4: 8086模式, 正常EOI
 
-    outb(PIC_M_DATA, 0b11111110); // 关闭主片所有中断
+    outb(PIC_M_DATA, 0b11111110); // 关闭主片所有中断, 只打开时钟中断, 也就是0的位置
     outb(PIC_S_DATA, 0b11111111); // 关闭从片所有中断
 }
 

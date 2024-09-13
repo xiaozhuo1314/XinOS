@@ -21,11 +21,28 @@ interrupt_handler_%1:
 %endmacro
 
 interrupt_entry:
-    ; 我们起始并不需要错误码或者0x20180719, 而是需要中断号就可以, 中断号此时就在栈顶
-    mov eax, [esp]
+    ; 保存段寄存器
+    push ds
+    push es
+    push fs
+    push gs
+    ; 保存8个功能寄存器
+    pusha
+    ; 我们其实并不需要错误码或者0x20180719, 而是需要中断号就可以, 由于前面压入了寄存器, 中断向量号需要找
+    mov eax, [esp + 12 * 4]
+    ; 由于此时中断向量号不在栈顶了, 因此无法当作中断处理函数的输入参数了, 因此需要重新压入
+    push eax
     ; 调用终端处理函数, handler_table中每个函数地址都占用4个字节
     call [handler_table + eax * 4]
-    ; 调用完后回复栈, 就是去掉两个参数
+    ; 调用完后回复栈, 去掉参数
+    add esp, 4
+    ; 恢复寄存器
+    popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    ; 去掉前面压入的%1和%2
     add esp, 8
     ; 返回, 要用iret
     iret

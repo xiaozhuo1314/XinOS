@@ -44,20 +44,21 @@ void schedule() {
     task_t *next = cur == a ? b : a;
     // 切换任务
     task_switch(next);
-    return;
 }
 
-u32 thread_a() {
+u32 _ofp thread_a() {
+    // 由于中断之后if位为0, 所以这里需要置为1, 这样就可以接收所有中断了
+    asm volatile("sti");
     while(true) {
         printk("thread_a\n");
-        schedule();
     }
 }
 
-u32 thread_b() {
+u32 _ofp thread_b() {
+    // 由于中断之后if位为0, 所以这里需要置为1, 这样就可以接收所有中断了
+    asm volatile("sti");
     while(true) {
         printk("thread_b\n");
-        schedule();
     }
 }
 
