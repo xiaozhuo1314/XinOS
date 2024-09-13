@@ -50,7 +50,8 @@ $(BUILD)/kernel.bin: $(BUILD)/kernel/start.o \
 	$(BUILD)/kernel/interrupt.o \
 	$(BUILD)/kernel/handler.o \
 	$(BUILD)/lib/vsprintf.o \
-	$(BUILD)/lib/string.o
+	$(BUILD)/lib/string.o \
+	$(BUILD)/lib/stdlib.o
 
 	$(shell mkdir -p $(dir $@))
 	ld -m elf_i386 -static $^ -o $@ -Ttext $(ENTRYPOINT)
@@ -77,6 +78,10 @@ test: $(BUILD)/master.img
 clean: 
 	rm -rf $(BUILD)
 
+.PHONY: bochs-gdb
+bochs-gdb: $(BUILD)/master.img
+	/home/silence/bochs/bochs-gdb/bin/bochs -q -f bochsrc.gdb
+
 .PHONY: bochs
 bochs: $(BUILD)/master.img
-	/home/deschanel/bochs/bin/bochs -q -f bochsrc.gdb
+	bochs -q -f bochsrc

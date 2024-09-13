@@ -1,9 +1,23 @@
 #include "xinos/interrupt.h"
 #include "xinos/global.h"
 #include "xinos/printk.h"
+#include "xinos/debug.h"
+#include "xinos/io.h"
+#include "xinos/stdlib.h"
 
-// 异常一共有32个
-#define ENTRY_SIZE 0x20
+// 异常一共有32个, 再加上了16个中断
+#define ENTRY_SIZE 0x30
+#define EXCEPTION_ENTRY_SIZE 0x20
+
+// 设置日志
+#define LOGK(fmt, args...) DEBUGK(fmt, ##args)
+
+// 级联了两个中断控制器, 一个主片, 一个从片
+#define PIC_M_CTRL 0x20 // 主片的控制端口
+#define PIC_M_DATA 0x21 // 主片的数据端口
+#define PIC_S_CTRL 0xa0 // 从片的控制端口
+#define PIC_S_DATA 0xa1 // 从片的数据端口
+#define PIC_EOI 0x20    // 通知中断控制器中断结束
 
 // 中断描述符表
 gate_t idt[IDT_SIZE];
@@ -44,6 +58,28 @@ static char *messages[] = {
 };
 
 /**
+ * 通知中断控制器中断处理结束了
+ * vector: 外部中断向量
+*/
+void send_eoi(int vector) {
+    if(vector >= 0x20 && vector < 0x28) {  // 说明只有一个主片
+        outb(PIC_M_CTRL, PIC_EOI);
+    } else if(vector >= 0x28 && vector < 0x30) {  // 既有主片也有从片
+        outb(PIC_M_CTRL, PIC_EOI);
+        outb(PIC_S_CTRL, PIC_EOI);
+    }
+}
+
+u32 counter = 0;
+/**
+ * 默认中断处理函数
+*/
+void default_handler(int vector) {
+    send_eoi(vector);
+    LOGK("[%d] default interrupt called %d...\n", vector, counter++);
+}
+
+/**
  * 异常处理函数
  * vector为异常向量, 也就是handler.asm中的%1
  */
@@ -56,13 +92,33 @@ void exception_handler(int vector) {
     // 输出异常信息
     printk("Exception : [0x%02X] %s \n", vector, msg);
     // 阻塞
-    while(true) ;
+    hang();
     // 阻塞如果完成就是出错了
     asm volatile("ud2");
 }
 
-// 中断处理初始化
-void interrupt_init() {
+/**
+ * 初始化中断控制器
+*/
+void pic_init() {
+    outb(PIC_M_CTRL, 0b00010001); // ICW1: 边沿触发, 级联 8259, 需要ICW4.
+    outb(PIC_M_DATA, 0x20);       // ICW2: 主片起始中断向量号 0x20, 也就是send_eoi中需要根据这个来判断有几个中断控制器
+    outb(PIC_M_DATA, 0b00000100); // ICW3: IR2接从片.
+    outb(PIC_M_DATA, 0b00000001); // ICW4: 8086模式, 正常EOI
+
+    outb(PIC_S_CTRL, 0b00010001); // ICW1: 边沿触发, 级联 8259, 需要ICW4.
+    outb(PIC_S_DATA, 0x28);       // ICW2: 从片起始中断向量号 0x28, 也就是send_eoi中需要根据这个来判断有几个中断控制器
+    outb(PIC_S_DATA, 2);          // ICW3: 设置从片连接到主片的 IR2 引脚
+    outb(PIC_S_DATA, 0b00000001); // ICW4: 8086模式, 正常EOI
+
+    outb(PIC_M_DATA, 0b11111110); // 关闭主片所有中断
+    outb(PIC_S_DATA, 0b11111111); // 关闭从片所有中断
+}
+
+/**
+ * 初始化中断描述符和中断处理函数表
+*/
+void idt_init() {
     /**
      * 当我们去调用int 0x80的时候, cpu回去找中断描述符中下标为16x8+0=128的那个描述符
      * 然后通过这个描述符找到对应的中断处理函数
@@ -70,7 +126,7 @@ void interrupt_init() {
      * 当我们调用int 0x80的时候, 就会去调用这个中断处理函数
      * 而调用int 0x10就会报错找不到中断处理函数
      */
-    for(int i = 0; i < ENTRY_SIZE; ++i) {
+    for(size_t i = 0; i < ENTRY_SIZE; ++i) {
         gate_t *gate = &idt[i];
         handler_t handler = handler_entry_table[i];
         gate->offset0 = ((u32)handler) & 0xffff;
@@ -83,12 +139,21 @@ void interrupt_init() {
         gate->offset1 = (((u32)handler) >> 16) & 0xffff;
     }
     // 设置handler_table
-    for(int i = 0; i < ENTRY_SIZE; ++i) {
-        handler_table[i] = exception_handler;
+    for(size_t i = 0; i < ENTRY_SIZE; ++i) {
+        if(i < EXCEPTION_ENTRY_SIZE)
+            handler_table[i] = exception_handler;
+        else
+            handler_table[i] = default_handler;
     }
     // 设置idt指针
     idt_ptr.base = (u32)&idt;
     idt_ptr.limit = sizeof(idt) - 1;
     // 加载idt_ptr
     asm volatile("lidt idt_ptr\n");
+}
+
+// 中断处理初始化
+void interrupt_init() {
+    pic_init();
+    idt_init();
 }
