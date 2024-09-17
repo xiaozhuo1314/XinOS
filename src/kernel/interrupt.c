@@ -4,6 +4,7 @@
 #include "xinos/debug.h"
 #include "xinos/io.h"
 #include "xinos/stdlib.h"
+#include "xinos/assert.h"
 
 // 异常一共有32个, 再加上了16个中断
 #define ENTRY_SIZE 0x30
@@ -73,6 +74,35 @@ void send_eoi(int vector) {
 }
 
 u32 counter = 0;
+
+/**
+ * 设置特殊的中断处理器
+ */
+void set_interrupt_handler(u32 irq, handler_t handler) {
+    assert(irq >= 0 && irq < 16);
+    // 设置特殊的处理函数
+    handler_table[IRQ_MASTER_NR + irq] = handler;
+}
+
+/**
+ * 设置是否开启特殊的中断处理
+ */
+void set_interrupt_mask(u32 irq, bool enable) {
+    assert(irq >= 0 && irq < 16);
+    u16 port;
+    if (irq < 8) {  // 主片
+        port = PIC_M_DATA;
+    } else {  // 从片
+        port = PIC_S_DATA;
+        irq -= 8; // 从片的向量号也是从0开始的
+    }
+    if (enable) {  // 如果允许开启的话, 就将对应位置处的位置为0
+        outb(port, inb(port) & ~(1 << irq));
+    } else {  // 如果不允许开启的话, 就将对应位置处的位置为1
+        outb(port, inb(port) | (1 << irq));
+    }
+}
+
 /**
  * 默认中断处理函数
 */
@@ -93,7 +123,7 @@ void default_handler(int vector) {
      * 因此此时就无法再通过中断调用到taska了
     */
     send_eoi(vector);
-    schedule();
+    DEBUGK("[0x%x] default interrupt called %d...\n", vector, counter);
 }
 
 /**
@@ -141,8 +171,8 @@ void pic_init() {
     outb(PIC_S_DATA, 2);          // ICW3: 设置从片连接到主片的 IR2 引脚
     outb(PIC_S_DATA, 0b00000001); // ICW4: 8086模式, 正常EOI
 
-    outb(PIC_M_DATA, 0b11111110); // 关闭主片所有中断, 只打开时钟中断, 也就是0的位置
-    outb(PIC_S_DATA, 0b11111111); // 关闭从片所有中断
+    outb(PIC_M_DATA, 0b11111111); // 关闭主片所有中断, 用set_interrupt_mask来开启
+    outb(PIC_S_DATA, 0b11111111); // 关闭从片所有中断, 用set_interrupt_mask来开启
 }
 
 /**

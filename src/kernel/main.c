@@ -1,19 +1,16 @@
-#include "xinos/types.h"
-#include "xinos/io.h"
-#include "xinos/string.h"
-#include "xinos/console.h"
-#include "xinos/assert.h"
-#include "xinos/debug.h"
-#include "xinos/global.h"
-#include "xinos/task.h"
-#include "xinos/interrupt.h"
-#include "xinos/stdlib.h"
-
-char msg[] = "hello xinos\n";
+extern void console_init();
+extern void gdt_init();
+extern void interrupt_init();
+extern void clock_init();
+extern void hang();
 
 void kernel_init() {
     console_init();
     gdt_init();
     interrupt_init();
-    task_init();
+    // task_init();
+    clock_init();
+    // 开启中断, 时钟中断是不可屏蔽的, 因此不需要多次sti
+    asm volatile("sti");
+    hang();
 }
