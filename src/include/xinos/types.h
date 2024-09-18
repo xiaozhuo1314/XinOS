@@ -26,4 +26,7 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+// 时间戳
+typedef u32 time_t;
+
 #endif

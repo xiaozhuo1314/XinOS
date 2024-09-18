@@ -79,16 +79,13 @@ void start_beep() {
     }
     // 加5是为了每次让蜂鸣器响5个时钟中断
     beeping = jiffies + 5;
-    DEBUGK("start beeping %d ...%d\n", jiffies, beeping);
 }
 
 /**
  * 停止beeping
  */
 void stop_beep() {
-
     if (beeping && jiffies >= beeping) {
-        DEBUGK("stop beeping %d ...%d\n", jiffies, beeping);
         outb(SPEAKER_REG, inb(SPEAKER_REG) & 0xfc);  // 设置0 ~ 1位为 0
         beeping = 0;
     }
