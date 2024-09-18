@@ -41,9 +41,58 @@
 #define CLOCK_COUNTER (OSCILLATOR / HZ)
 #define JIFFY (1000 / HZ)
 
+/**
+ * 蜂鸣器相关
+ * 
+ * 扬声器有两种状态，输入和输出，状态可以通过键盘控制器中的端口号 `0x61` 设置
+ * 该寄存器结构如下
+   | 位  | 描述            |
+   | --- | --------------- |
+   | 0   | 计数器 2 门有效 |
+   | 1   | 扬声器数据有效  |
+   | 2   | 通道校验有效    |
+   | 3   | 奇偶校验有效    |
+   | 4   | 保留            |
+   | 5   | 保留            |
+   | 6   | 通道错误        |
+   | 7   | 奇偶错误        |
+
+   需要将 0 ~ 1 位置为 1，然后计数器 2 设置成 3 方波模式，就可以播放方波的声音。
+ */
+#define SPEAKER_REG 0x61
+#define BEEP_HZ 440  // 一般设置为440HZ
+#define BEEP_COUNTER (OSCILLATOR / BEEP_HZ)
+
 // 时间片计数器
 u32 volatile jiffies = 0;
 u32 jiffy = JIFFY;
+
+// 蜂鸣器相关
+u32 volatile beeping = 0;
+
+/**
+ * 设置beeping
+ */
+void start_beep() {
+    if (!beeping) { // 如果beeping为0, 说明还没开始蜂鸣, 需要设置0 ~ 1位为 1
+        outb(SPEAKER_REG, inb(SPEAKER_REG) | 0b11);
+    }
+    // 加5是为了每次让蜂鸣器响5个时钟中断
+    beeping = jiffies + 5;
+    DEBUGK("start beeping %d ...%d\n", jiffies, beeping);
+}
+
+/**
+ * 停止beeping
+ */
+void stop_beep() {
+
+    if (beeping && jiffies >= beeping) {
+        DEBUGK("stop beeping %d ...%d\n", jiffies, beeping);
+        outb(SPEAKER_REG, inb(SPEAKER_REG) & 0xfc);  // 设置0 ~ 1位为 0
+        beeping = 0;
+    }
+}
 
 /**
  * 时钟中断处理函数
@@ -53,9 +102,15 @@ void clock_handler(int vector) {
     assert(vector == 0x20);
     // 告诉中断控制器已经中断处理完成,否则一直在屏蔽中
     send_eoi(vector);
+    // 蜂鸣器
+    if(jiffies % 200 == 0) {  // 每200个时钟中断就让蜂鸣器响5个周期
+        start_beep();
+    }
     // 累加计数器
     ++jiffies;
     DEBUGK("clock jiffies %d ...\n", jiffies);
+    // 调用beeping停止, 尝试去停止
+    stop_beep();
 }
 
 /**
@@ -93,6 +148,11 @@ void pit_init() {
     // 下面设置时钟中断的间隔, 也就是振荡器震荡多少次触发中断
     outb(PIT_CHAN0_REG, CLOCK_COUNTER & 0xff);
     outb(PIT_CHAN0_REG, (CLOCK_COUNTER >> 8) & 0xff);
+
+    // 配置计数器 2 蜂鸣器
+    outb(PIT_CTRL_REG, 0b10110110);
+    outb(PIT_CHAN2_REG, (u8)BEEP_COUNTER);
+    outb(PIT_CHAN2_REG, (u8)(BEEP_COUNTER >> 8));
 }
 
 void clock_init() {

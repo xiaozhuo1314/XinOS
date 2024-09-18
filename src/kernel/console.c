@@ -47,6 +47,9 @@ static int x, y;                             // 当前光标的坐标, 不是内
 static u8 attr = 7;                  // 字符样式
 static u16 erase = 0x0720;    // 带有样式的空格, 因为前一个字节是字符空格0x20, 后一个字节是样式0x07, 而从第一个字符开始的内存地址是增长的, 所以0x07是在高位的
 
+// 使用按键进行蜂鸣
+extern void start_beep();
+
 // 获得当前屏幕在内存中的位置
 static void get_screen() {
     outb(CRT_ADDR_REG, CRT_START_ADDR_H);
@@ -205,6 +208,7 @@ void console_write(char *buf, u32 count) {
             case ASCII_ENQ:
                 break;
             case ASCII_BEL:
+                start_beep();
                 break;
             case ASCII_BS:
                 command_bs();
