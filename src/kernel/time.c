@@ -2,6 +2,7 @@
 #include "xinos/debug.h"
 #include "xinos/stdlib.h"
 #include "xinos/io.h"
+#include "xinos/rtc.h"
 
 // 定义日志打印函数
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
@@ -16,7 +17,7 @@
 #define CMOS_ADDR 0x70 // CMOS 地址寄存器
 #define CMOS_DATA 0x71 // CMOS 数据寄存器
 
-// CMOS信息的寄存器索引
+// CMOS信息的寄存器索引(读取)
 #define CMOS_SECOND 0x00  // (0 ~ 59) 秒
 #define CMOS_MINUTE 0x02  // (0 ~ 59) 分钟
 #define CMOS_HOUR 0x04    // (0 ~ 23) 小时
@@ -113,19 +114,6 @@ time_t get_yday(tm *time) {
     if(time->tm_mon > 2 && ((year + 2) % 4)) ans -= 1;
 
     return ans;
-}
-
-/**
- * 按照字节读取cmos寄存器数据
- */
-u8 cmos_read(u8 addr) {
-    /**
-     * 需要使用out向端口0x70发送需要读取的内存位置的偏移值
-     * 需要注意的是: 读取数据的时候需要关闭nmi不可屏蔽中断
-     */
-    outb(CMOS_ADDR, CMOS_NMI | addr);
-    // 然后使用in指令从0x71端口读取指定的字节信息
-    return inb(CMOS_DATA);
 }
 
 /**
