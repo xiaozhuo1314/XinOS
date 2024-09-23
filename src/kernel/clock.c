@@ -102,13 +102,10 @@ void clock_handler(int vector) {
     assert(vector == 0x20);
     // 告诉中断控制器已经中断处理完成,否则一直在屏蔽中
     send_eoi(vector);
-    // 蜂鸣器
-    if(jiffies % 200 == 0) {  // 每200个时钟中断就让蜂鸣器响5个周期
-        start_beep();
-    }
+
     // 累加计数器
     ++jiffies;
-    DEBUGK("clock jiffies %d ...\n", jiffies);
+    // DEBUGK("clock jiffies %d ...\n", jiffies);
     // 调用beeping停止, 尝试去停止
     stop_beep();
 }

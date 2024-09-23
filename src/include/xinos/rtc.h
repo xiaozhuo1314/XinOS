@@ -15,5 +15,7 @@
 u8 cmos_read(u8 addr);
 // 写入数据
 void cmos_write(u8 addr, u8 value);
+// 设置闹钟, secs是间隔
+void set_alarm(u32 secs);
 
 #endif
