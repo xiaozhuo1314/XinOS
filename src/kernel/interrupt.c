@@ -13,7 +13,9 @@
 // 设置日志
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
-// 级联了两个中断控制器, 一个主片, 一个从片
+/**
+ * 级联了两个中断控制器, 一个主片, 一个从片
+ */
 #define PIC_M_CTRL 0x20 // 主片的控制端口
 #define PIC_M_DATA 0x21 // 主片的数据端口
 #define PIC_S_CTRL 0xa0 // 从片的控制端口
