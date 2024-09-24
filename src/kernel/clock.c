@@ -79,6 +79,7 @@ u32 volatile beeping = 0;
 void start_beep() {
     if (!beeping) { // 如果beeping为0, 说明还没开始蜂鸣, 需要设置0 ~ 1位为 1
         outb(SPEAKER_REG, inb(SPEAKER_REG) | 0b11);
+        DEBUGK("start beeping\n");
     }
     // 加5是为了每次让蜂鸣器响5个时钟中断
     beeping = jiffies + 5;
@@ -91,6 +92,7 @@ void stop_beep() {
     if (beeping && jiffies >= beeping) {
         outb(SPEAKER_REG, inb(SPEAKER_REG) & 0xfc);  // 设置0 ~ 1位为 0
         beeping = 0;
+        DEBUGK("stop beeping\n");
     }
 }
 

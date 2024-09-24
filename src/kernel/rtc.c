@@ -118,7 +118,7 @@ void set_alarm(u32 secs) {
 void rtc_init() {
     cmos_write(CMOS_B, 0b00100010); // 打开闹钟中断
     cmos_read(CMOS_C); // 读 C 寄存器，以允许 CMOS 中断
-    set_alarm(20);
+    set_alarm(2);
     // 设置中断频率
     // outb(CMOS_A, (inb(CMOS_A) & 0xf) | 0b1110);  // 250ms, 但是由于我们并未开启周期中断, 所以这个没啥用
     
