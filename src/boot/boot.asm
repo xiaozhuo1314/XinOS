@@ -111,7 +111,7 @@ print:
     ret
 
 booting:
-    db "Booting Onix...", 10, 13, 0; \n\r
+    db "Booting XinOS...", 10, 13, 0; \n\r
 
 error:
     mov si, .msg
