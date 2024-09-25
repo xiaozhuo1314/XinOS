@@ -2,6 +2,8 @@
 #include "xinos/types.h"
 #include "xinos/assert.h"
 #include "xinos/debug.h"
+#include "xinos/stdlib.h"
+#include "xinos/string.h"
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -18,6 +20,11 @@
  */
 #define IDX(addr) ((u32)addr >> 12)
 
+// 通过页的索引获取内存地址
+#define PAGE(idx) ((u32)idx << 12)
+// 判定是否是4K对齐
+#define ASSERT_PAGE(addr) assert((addr & 0xfff) == 0)
+
 /**
  * ards结构体
  */
@@ -28,13 +35,13 @@ typedef struct ards_t {
 } _packed ards_t;
 
 // 可用内存的基地址, 一般是1M开始
-u32 memory_base = 0;
+static u32 memory_base = 0;
 // 可用内存的大小
-u32 memory_size = 0;
-// 最大页的索引, 包含最开始的1M
-u32 total_pages = 0;
-// 最大可用页的索引
-u32 free_pages = 0;
+static u32 memory_size = 0;
+// 页的总个数
+static u32 total_pages = 0;
+// 最大可用的页的个数
+static u32 free_pages = 0;
 // 已经使用的内存页数
 #define used_pages (total_pages - free_pages)
 
@@ -78,15 +85,108 @@ void memory_init(u32 magic, u32 addr) {
 
     // 判断内存开始的位置是否是1M
     assert(memory_base == MEMORY_BASE);
-    // 要求按页对其, 就是看最后12位是否都为0
+    // 要求按页对齐, 就是看最后12位是否都为0
+    // 因为我们设置的单位是4K, 所以内存大小要以4K为单位的
+    // todo 这里是不是应该对memory_size向下对齐到4K比较好呢?
     assert((memory_size & 0xfff) == 0);
 
-    // 可用页数, 起始就是页的最大索引
+    // 可用页数
     free_pages = IDX(memory_size);
+    // 总页数
     total_pages = IDX(MEMORY_BASE) + free_pages;
 
-    // 页的个数就是最大索引+1
-    LOGK("Total pages %d\n", total_pages + 1);
-    // 可用页的个数就是最大可用页索引+1
-    LOGK("Free pages %d\n", free_pages + 1);
+    // 页的个数
+    LOGK("Total pages %d\n", total_pages);
+    // 可用页的个数
+    LOGK("Free pages %d\n", free_pages);
+}
+
+// 可分配物理内存的起始页
+static u32 start_page = 0;
+// 物理内存数组起始指针, 这里采用一个字节去表示一页内存被引用的数量, 最多255次
+static u8 *memory_map;
+// 物理内存数组所占用的页数
+static u32 memory_map_pages;
+
+void memory_map_init() {
+    // 获取memory_map位置
+    memory_map = (u8*)memory_base;
+    /**
+     * 查看物理内存数组的大小
+     * 每一页占用一个字节, 一共有total_pages个页, 那么一共有total_pages个字节
+     * 这些个字节占用多少页, 就是total_pages / PAGE_SIZE, 需要向上取整
+     */
+    memory_map_pages = div_round_up(total_pages, PAGE_SIZE);
+    // 初始化物理内存数组
+    memset((void*)memory_map, 0, memory_map_pages * PAGE_SIZE);
+    LOGK("Memory map page count %d\n", memory_map_pages);
+
+    // 更新可用内存页的个数
+    free_pages -= memory_map_pages;
+    // 更新可用内存页的位置, 前面1M不能用, 然后物理内存数组所在页不能用
+    start_page = IDX(MEMORY_BASE) + memory_map_pages;
+
+    // 设置start_page前面的内存已经使用了1次
+    for(size_t i = 0; i < start_page; ++i) {
+        memory_map[i] = 1;
+    }
+
+    LOGK("Total pages %d free pages %d\n", total_pages, free_pages);
+}
+
+/**
+ * 分配一页物理内存
+ */
+static u32 get_page() {
+    // 先看一下有没有自由内存页
+    assert(free_pages > 0);
+    // 循环查找
+    for(size_t i = start_page; i < total_pages; ++i) {
+        if(memory_map[i]) // 当前被占用
+            continue;
+        // 未被使用
+        memory_map[i] = 1;
+        free_pages--;
+        // 返回地址, 而不是页的索引, 所以需要左移12位
+        u32 page = ((u32)i) << 12;
+        LOGK("GET page 0x%p\n", page);
+        return page;
+    }
+    panic("Out of Memory!!!\n");
+}
+
+/**
+ * 释放一页物理内存
+ */
+static void put_page(u32 addr) {
+    // 确保过来释放的内存是4K对齐的
+    ASSERT_PAGE(addr);
+    // 获取页的索引
+    u32 idx = IDX(addr);
+    // 判断该页是在可用内存区域
+    assert(idx >= start_page && idx < total_pages);
+    // 保证是有引用的, 否则一个未被使用的内存是不能释放的
+    assert(memory_map[idx] >= 1);
+
+    // 释放内存页
+    memory_map[idx]--;
+    // 如果此时没有引用了, 就放到空闲中, 因此free_pages加1, 否则就是还有引用, 不能放到空闲中
+    if(memory_map[idx] == 0) free_pages++;
+
+    // 自由内存页个数应该大于等于0, 且由于前面1M和物理内存数组的存在, 肯定要小于total_pages
+    assert(free_pages >= 0 && free_pages < total_pages);
+    LOGK("PUT page 0x%p\n", addr);
+}
+
+// 简单测试
+void memory_test() {
+    u32 pages[10];
+    for (size_t i = 0; i < 10; i++)
+    {
+        pages[i] = get_page();
+    }
+    for (size_t i = 0; i < 10; i++)
+    {
+        put_page(pages[i]);
+    }
 }
