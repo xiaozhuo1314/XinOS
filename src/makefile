@@ -91,18 +91,18 @@ clean:
 
 .PHONY: bochs-gdb
 bochs-gdb: $(BUILD)/master.img
-	/home/silence/bochs/bochs-gdb/bin/bochs -q -f bochsrc.gdb
+	/home/silence/bochs/bochs-gdb/bin/bochs -q -f bochsrc.gdb -unlock
 
 .PHONY: bochs
 bochs: $(BUILD)/master.img
-	bochs -q -f bochsrc
+	bochs -q -f bochsrc -unlock
 
 QEMU:= qemu-system-i386 \
 	-m 32M \
 	-boot c \
 	-drive file=$(BUILD)/master.img,if=ide,index=0,media=disk,format=raw \
 	-rtc base=localtime \
-	-audiodev pa,id=hda \
+	-audiodev pa,id=hda,server=$(shell echo $(HOST_IP)):4713 \
 	-machine pcspk-audiodev=hda \
 
 .PHONY: qemu

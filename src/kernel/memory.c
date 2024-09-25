@@ -108,6 +108,9 @@ static u8 *memory_map;
 // 物理内存数组所占用的页数
 static u32 memory_map_pages;
 
+/**
+ * 物理内存数组设置
+ */
 void memory_map_init() {
     // 获取memory_map位置
     memory_map = (u8*)memory_base;
@@ -176,6 +179,89 @@ static void put_page(u32 addr) {
     // 自由内存页个数应该大于等于0, 且由于前面1M和物理内存数组的存在, 肯定要小于total_pages
     assert(free_pages >= 0 && free_pages < total_pages);
     LOGK("PUT page 0x%p\n", addr);
+}
+
+// 获取cr3寄存器
+u32 get_cr3() {
+    asm volatile("movl %cr3, %eax\n");
+}
+
+// 设置cr3寄存器
+void set_cr3(u32 pde) {
+    ASSERT_PAGE(pde);
+    /**
+     * 扩展的内联汇编, 需要用两个%表示寄存器
+     * a表示eax, "a"(pde)表示将pde的值放到eax中
+     * 然后将eax的值赋给cr3
+     */
+    asm volatile("movl %%eax, %%cr3\n" :: "a"(pde));
+}
+
+/**
+ * 将cr0寄存器最高位PE置为1, 启用分页
+ */
+static void enable_page()
+{
+    asm volatile(
+        "movl %cr0, %eax\n"
+        "orl $0x80000000, %eax\n"
+        "movl %eax, %cr0\n");
+}
+
+/**
+ * 初始化页表项
+ * entry为页表入口的结构体
+ * index表示索引
+ */
+static void entry_init(page_entry_t *entry, u32 index) {
+    // 全都赋值为0
+    *(u32 *)entry = 0;
+    
+    entry->present = 1;      // 在内存中
+    entry->write = 1;        // 可读可写
+    entry->user = 1;         // 所有人可用
+    entry->index = index;    // 设置索引
+}
+
+// 内核页目录存放的位置
+#define KERNEL_PAGE_DIR 0x200000
+// 内核页表存放的位置, 因为页目录占用4K, 所以页表就多了0x1000
+#define KERNEL_PAGE_ENTRY 0x201000
+
+/**
+ * 初始化内存映射
+ */
+void mapping_init() {
+    /**
+     * 我们先初始化大小为4MB的映射, 也就是只需要pde的第一个元素, pte的第一个4K
+     */
+
+    // 获取页目录表初始地址
+    page_entry_t *pde = (page_entry_t *)KERNEL_PAGE_DIR;
+    memset(pde, 0, PAGE_SIZE);
+    // 设置第一个元素, 第一个元素的索引就是页表的第一个4K位置的索引
+    entry_init(&pde[0], IDX(KERNEL_PAGE_ENTRY));
+
+    // 设置pte的第一个4K, 每个元素占4B, 共1024个
+    page_entry_t *pte = (page_entry_t *)KERNEL_PAGE_ENTRY;
+    for(size_t i = 0; i < 1024; ++i) {
+        /**
+         * 这里要注意的是, pde中的索引是二级页表对应内存页所在的索引
+         * 而pte由于直接指向的是内存页了, 所以索引是内存页的索引, 而不是下一级页表的索引
+         * 像本程序中, 二级页表所在的位置是从KERNEL_PAGE_ENTRY开始的, 因此所在内存页不是从0开始的
+         * 而pte指向的内存页就是内存, 就是从0开始的, 所以直接用i
+         */
+        entry_init(&pte[i], i);
+        // 设置物理内存备用了
+        memory_map[i] = 1;
+    }
+
+    // 设置cr3寄存器
+    set_cr3((u32)pde);
+    // 分页有效
+    enable_page();
+
+    BMB;
 }
 
 // 简单测试
