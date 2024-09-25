@@ -1,10 +1,19 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "xinos.h"
+
 #define EOF -1                                                // 结尾
 #define NULL ((void*)0)                                // 空指针
 
 #define EOS '\0'                                              // 字符串结尾
+
+// 没什么用处
+#ifndef __cplusplus
+#define bool _Bool
+#define true 1
+#define false 0
+#endif
 
 #define bool _Bool                                          // 布尔类型
 #define true 1                                                  // true为1

@@ -33,8 +33,8 @@ detect_memory:
     ; 将缓存指针指向下一个结构体
     add di, cx
 
-    ; 将结构体数量加一
-    inc word [ards_count]
+    ; 将结构体数量加一, dword是32位
+    inc dword [ards_count]
 
     cmp ebx, 0
     jnz .next
@@ -109,6 +109,9 @@ protect_mode:
     mov bl, 200; 扇区数量
 
     call read_disk
+
+    mov eax, 0x20180719  ; 用于在内存初始化的时候看一下是否是内核进行的
+    mov ebx, ards_count  ; 结构体数量的内存地址, 是数量的地址, 不是结构体的地址, 用于内存初始化
 
     jmp dword code_selector:0x10000
 
@@ -218,6 +221,6 @@ gdt_data:
 gdt_end:
 
 ards_count:
-    dw 0
+    dd 0  ; 32位
 ards_buffer:
 
