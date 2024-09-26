@@ -19,11 +19,49 @@
  * 4K就是2的12次方
  */
 #define IDX(addr) ((u32)addr >> 12)
+/**
+ * 获取页目录索引
+ * 页目录索引是地址的最高10位, 0x3ff就是10个bit位为1
+ */
+#define DIDX(addr) (((u32)addr >> 22) & 0x3ff)
+/**
+ * 获取页表索引
+ * 页表索引是中间的10位
+ */
+#define TIDX(addr) (((u32)addr >> 12) & 0x3ff)
 
 // 通过页的索引获取内存地址
 #define PAGE(idx) ((u32)idx << 12)
 // 判定是否是4K对齐
 #define ASSERT_PAGE(addr) assert((addr & 0xfff) == 0)
+
+/**
+ * 内核页目录存放的位置, 本来0x1000是loader.bin的位置, 但是这个程序已经使用完毕了, 因此这个位置用来存放内核页目录
+ * 页目录占用了4K
+ */
+#define KERNEL_PAGE_DIR 0x1000
+/**
+ * 页表存放的位置, 每个页表占4个字节
+ * 由于页目录占用4K, 所以要从0x2000开始
+ * 每个页表占用4K, 所以下一个页表是0x3000
+ * 
+ * 目前这里可以表示8M内存
+ * 
+ * 从0x2000开始到0x10000(不包含), 总共有14个地址可以使用, 那么就可以表示14x4M内存
+ */
+static u32 KERNEL_PAGE_TABLE[] = {
+    0x2000,
+    0x3000
+};
+
+/**
+ * 内核内存的大小, 总共的
+ * KERNEL_PAGE_TABLE中的每个页表可以表示4M内存, 有两个页表就是8M内存
+ * 也就是4M * 页表个数 = 4M * (sizeof(KERNEL_PAGE_TABLE) / 4) = 1M * sizeof(KERNEL_PAGE_TABLE)
+ * 也就是0x100000 * sizeof(KERNEL_PAGE_TABLE)
+ * 
+ */
+#define KERNEL_MEMORY_SIZE (0x100000 * sizeof(KERNEL_PAGE_TABLE))
 
 /**
  * ards结构体
@@ -46,7 +84,7 @@ static u32 free_pages = 0;
 #define used_pages (total_pages - free_pages)
 
 /**
- * 内存初始化
+ * 物理内存初始化
  */
 void memory_init(u32 magic, u32 addr) {
     if(magic != KERNEL_MAGIC) {
@@ -89,6 +127,11 @@ void memory_init(u32 magic, u32 addr) {
     // 因为我们设置的单位是4K, 所以内存大小要以4K为单位的
     // todo 这里是不是应该对memory_size向下对齐到4K比较好呢?
     assert((memory_size & 0xfff) == 0);
+    // 看一下检查出来的大小是否小于规定的大小, 如果小于的话, 说明内存条内存不够
+    if(memory_size < KERNEL_MEMORY_SIZE) {
+        panic("System memory is %dM too small, at least %dM needed\n",
+              memory_size / 0x100000, KERNEL_MEMORY_SIZE / 0x100000);
+    }
 
     // 可用页数
     free_pages = IDX(memory_size);
@@ -112,7 +155,7 @@ static u32 memory_map_pages;
  * 物理内存数组设置
  */
 void memory_map_init() {
-    // 获取memory_map位置
+    // 获取memory_map位置, 此时是1M的位置
     memory_map = (u8*)memory_base;
     /**
      * 查看物理内存数组的大小
@@ -200,7 +243,7 @@ void set_cr3(u32 pde) {
 /**
  * 将cr0寄存器最高位PE置为1, 启用分页
  */
-static void enable_page()
+static _inline void enable_page()
 {
     asm volatile(
         "movl %cr0, %eax\n"
@@ -223,11 +266,6 @@ static void entry_init(page_entry_t *entry, u32 index) {
     entry->index = index;    // 设置索引
 }
 
-// 内核页目录存放的位置
-#define KERNEL_PAGE_DIR 0x200000
-// 内核页表存放的位置, 因为页目录占用4K, 所以页表就多了0x1000
-#define KERNEL_PAGE_ENTRY 0x201000
-
 /**
  * 初始化内存映射
  */
@@ -239,22 +277,53 @@ void mapping_init() {
     // 获取页目录表初始地址
     page_entry_t *pde = (page_entry_t *)KERNEL_PAGE_DIR;
     memset(pde, 0, PAGE_SIZE);
-    // 设置第一个元素, 第一个元素的索引就是页表的第一个4K位置的索引
-    entry_init(&pde[0], IDX(KERNEL_PAGE_ENTRY));
 
-    // 设置pte的第一个4K, 每个元素占4B, 共1024个
-    page_entry_t *pte = (page_entry_t *)KERNEL_PAGE_ENTRY;
-    for(size_t i = 0; i < 1024; ++i) {
+    // 内存页的索引
+    idx_t index = 0;
+    /**
+     * 遍历每个页表的位置, 然后页表中的每4B表示一个页
+     */
+    for(idx_t didx = 0; didx < sizeof(KERNEL_PAGE_TABLE) / 4; ++didx) {
         /**
-         * 这里要注意的是, pde中的索引是二级页表对应内存页所在的索引
-         * 而pte由于直接指向的是内存页了, 所以索引是内存页的索引, 而不是下一级页表的索引
-         * 像本程序中, 二级页表所在的位置是从KERNEL_PAGE_ENTRY开始的, 因此所在内存页不是从0开始的
-         * 而pte指向的内存页就是内存, 就是从0开始的, 所以直接用i
+         * 1. 向页目录中设置
          */
-        entry_init(&pte[i], i);
-        // 设置物理内存备用了
-        memory_map[i] = 1;
+        // 1.1 清空页表的页
+        page_entry_t *pte = (page_entry_t*)KERNEL_PAGE_TABLE[didx];
+        memset((void*)pte, 0, PAGE_SIZE);
+        // 1.2 设置页目录中的页表, 例如didx为0的时候, 就将2设置到了page_entry_t的index上
+        // 也就是说didx代表的页表的位置是内存页的2号索引的位置, 也就是0x2000的位置
+        entry_init(&pde[didx], IDX((u32)pte));
+        /**
+         * 2. 设置页表
+         */
+        for(idx_t tidx = 0; tidx < 1024; ++tidx, ++index) {
+            // 第0页不做映射, 用于空指针访问和缺页异常等
+            // 这里不能用tidx==0判断, 因此每一个didx循环都会有tidx为0的时候, 而我们只需要第0页不映射
+            if(index == 0) continue;
+            // 映射
+            entry_init(&pte[tidx], index);
+            // 设置物理内存该页被占用?
+            memory_map[index] = 1;
+        }
     }
+
+    /**
+     * 将最后一个页目录项指向页目录自己
+     * 这样的话, 在寻址的时候, 找到最后一个页目录项, cpu就找了页表, 恰好这个页表就是页目录
+     * 然后通过这个页表上面的page_entry_t就可以找到各个页, 这些页恰好就是页表
+     * 因此就可以修改这些页表所在的页了
+     * 而且由于页目录指代的页表的最后一个页表项指向的还是自己, 因此此时也就找到了页目录
+     * 
+     * 因此就可以通过虚拟内存来进行修改页目录和页表了
+     * 为什么不能通过cr3寄存器来修改页目录呢?
+     * 因为我们通过cr3获取到的地址, 读写这个地址的时候, 由于已经开启了分页机制
+     * cpu会将这个地址拿出最高10位找页目录中的索引, 然后中间10位找页表, 然后再找页, 很明显此时不是页目录所在的页了
+     * 
+     * 因此我们采用上面的机制, 就可以通过读写0xfffff000-0xffffffff来修改页目录了
+     * 那么页表修改的话, 最高10位是1, 就能拿到最后一个页目录项, 此时cpu认为页目录就是一个页表
+     * 然后修改中间10位就可以得到不同的页的位置, 也就是页表所在页的位置, 就可以修改了
+     */
+    entry_init(&pde[1023], IDX(KERNEL_PAGE_DIR));
 
     // 设置cr3寄存器
     set_cr3((u32)pde);
@@ -262,15 +331,59 @@ void mapping_init() {
     enable_page();
 }
 
+/**
+ * 获取页目录的虚拟内存位置, 已经开启分页了
+ */
+static page_entry_t *get_pde() {
+    return (page_entry_t *)(0xfffff000);
+}
+
+/**
+ * 获取某个虚拟地址的页表的虚拟内存位置
+ */
+static page_entry_t *get_pte(u32 vaddr) {
+    // 下面这三行是获取的页表的真实地址
+    // page_entry_t* pde = get_pde();
+    // idx_t didx = DIDX(vaddr);
+    // return (page_entry_t*)(pde[didx].index << 12);
+
+    /**
+     * 0xffc00000表示最高10位为1
+     * DIDX(vaddr) << 12表示将页目录索引放到了中间10位
+     * 
+     * 这样返回的虚拟地址, CPU首先拿到最高10位找到最后一个页目录项, 也就是指向了页目录本身
+     * 这样CPU就将页目录当成了页表
+     * 然后用中间10位, 也就是原来的页目录索引找到了页表在页目录中的项, 通过index找到了页表的真实位置
+     */
+    return (page_entry_t*)(0xffc00000 | (DIDX(vaddr) << 12));
+}
+
+// 刷新虚拟地址 vaddr 的 块表 TLB
+static void flush_tlb(u32 vaddr) {
+    asm volatile("invlpg (%0)" ::"r"(vaddr) : "memory");
+}
+
 // 简单测试
 void memory_test() {
-    u32 pages[10];
-    for (size_t i = 0; i < 10; i++)
-    {
-        pages[i] = get_page();
-    }
-    for (size_t i = 0; i < 10; i++)
-    {
-        put_page(pages[i]);
-    }
+    BMB;
+    // 将 20 M 0x1400000 内存映射到 64M 0x4000000 的位置
+    // 我们还需要一个页表，0x900000
+    u32 vaddr = 0x4000000; // 线性地址几乎可以是任意的
+    u32 paddr = 0x1400000; // 物理地址必须要确定存在
+    u32 table = 0x900000;  // 页表也必须是物理地址
+    page_entry_t *pde = get_pde();
+    page_entry_t *dentry = &pde[DIDX(vaddr)];
+    entry_init(dentry, IDX(table));
+    page_entry_t *pte = get_pte(vaddr);
+    page_entry_t *tentry = &pte[TIDX(vaddr)];
+    entry_init(tentry, IDX(paddr));
+    BMB;
+    char *ptr = (char *)(0x4000000);
+    ptr[0] = 'a';
+    BMB;
+    entry_init(tentry, IDX(0x1500000));
+    flush_tlb(vaddr);
+    BMB;
+    ptr[2] = 'b';
+    BMB;
 }
