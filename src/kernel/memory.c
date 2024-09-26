@@ -260,8 +260,6 @@ void mapping_init() {
     set_cr3((u32)pde);
     // 分页有效
     enable_page();
-
-    BMB;
 }
 
 // 简单测试
