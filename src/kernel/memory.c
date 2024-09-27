@@ -371,16 +371,22 @@ void memory_test() {
     u32 vaddr = 0x4000000; // 线性地址几乎可以是任意的
     u32 paddr = 0x1400000; // 物理地址必须要确定存在
     u32 table = 0x900000;  // 页表也必须是物理地址
+
+    // 将页表地址的索引放到页目录中, 要放的是物理地址的索引, 这样下面的get_pte获得的虚拟地址才会跟这个物理地址对应, 才能添加页表项
     page_entry_t *pde = get_pde();
     page_entry_t *dentry = &pde[DIDX(vaddr)];
     entry_init(dentry, IDX(table));
+    // 获取刚才放到页目录中的页表的虚拟地址
     page_entry_t *pte = get_pte(vaddr);
+    // 获取页表, cpu会把获取的页表的虚拟地址根据页目录转换成物理地址
     page_entry_t *tentry = &pte[TIDX(vaddr)];
+    // 添加页表项的索引等属性, 这里需要真实物理地址
     entry_init(tentry, IDX(paddr));
     BMB;
     char *ptr = (char *)(0x4000000);
     ptr[0] = 'a';
     BMB;
+    // 由于前面我们对tentry对应的页表进行了赋值操作, 这个页表已经被拷贝到了块表中, 所以这里修改后需要刷新
     entry_init(tentry, IDX(0x1500000));
     flush_tlb(vaddr);
     BMB;
