@@ -15,10 +15,6 @@
 #define false 0
 #endif
 
-#define bool _Bool                                          // 布尔类型
-#define true 1                                                  // true为1
-#define false 0                                                 // false为1
-
 #define _packed __attribute__((packed))         // 用于定义特殊的结构体
 
 // 用于省略函数的栈帧, 也就是调用函数时, 没有了push ebp     mov ebp, esp的操作
