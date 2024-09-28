@@ -83,7 +83,7 @@ int bitmap_scan(bitmap_t *map, u32 count) {
     }
 
     // 找到了就需要设置这些位为1
-    while(cur_bit >= start) {
+    while(counter--) {
         bitmap_set(map, cur_bit--, true);
     }
 
@@ -100,7 +100,22 @@ void bitmap_tests()
     bitmap_init(&map, buf, LEN, 0);
     for (size_t i = 0; i < 33; i++)
     {
+        // 找个连续0的个数为1的, 所以最多能找16次  0-15
         idx_t idx = bitmap_scan(&map, 1);
+        if (idx == EOF)
+        {
+            LOGK("TEST FINISH\n");
+            break;
+        }
+        LOGK("%d %d\n", i, idx);
+    }
+
+    memset((void*)buf, 0, LEN);
+    bitmap_init(&map, buf, LEN, 0);
+    for (size_t i = 0; i < 5; i++)
+    {
+        // 找个连续0的个数为1<<i
+        idx_t idx = bitmap_scan(&map, 1 << i);
         if (idx == EOF)
         {
             LOGK("TEST FINISH\n");
