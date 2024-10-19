@@ -4,6 +4,7 @@
 #include "xinos/debug.h"
 #include "xinos/stdlib.h"
 #include "xinos/string.h"
+#include "xinos/bitmap.h"
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -55,6 +56,11 @@ static u32 KERNEL_PAGE_TABLE[] = {
 };
 
 /**
+ * 位图所在的位置
+ */
+#define KERNEL_MAP_BITS 0x4000
+
+/**
  * 内核内存的大小, 总共的
  * KERNEL_PAGE_TABLE中的每个页表可以表示4M内存, 有两个页表就是8M内存
  * 也就是4M * 页表个数 = 4M * (sizeof(KERNEL_PAGE_TABLE) / 4) = 1M * sizeof(KERNEL_PAGE_TABLE)
@@ -62,6 +68,11 @@ static u32 KERNEL_PAGE_TABLE[] = {
  * 
  */
 #define KERNEL_MEMORY_SIZE (0x100000 * sizeof(KERNEL_PAGE_TABLE))
+
+/**
+ * bitmap变量, 里面的bits就是位图所在的位置, 占1页
+ */
+bitmap_t kernel_map;
 
 /**
  * ards结构体
@@ -178,6 +189,14 @@ void memory_map_init() {
     }
 
     LOGK("Total pages %d free pages %d\n", total_pages, free_pages);
+
+    /**
+     * 我们需要把1M-8M的位置设置位图, 由于前面1M是固定的, 所以不在位图表示的范围内
+     * 由于位图是每个比特位代表一页, 因此这里计算字节长度的时候得除以8
+     */
+    u32 length = (IDX(KERNEL_MEMORY_SIZE) - IDX(MEMORY_BASE)) >> 3;
+    bitmap_init(&kernel_map, (u8*)KERNEL_MAP_BITS, length, IDX(MEMORY_BASE));
+    bitmap_scan(&kernel_map, memory_map_pages);  // 由于1M处开始的是物理内存数组, 这部分内存时已经被用了, 所以需要设置上
 }
 
 /**
@@ -363,8 +382,43 @@ static void flush_tlb(u32 vaddr) {
     asm volatile("invlpg (%0)" ::"r"(vaddr) : "memory");
 }
 
-// 简单测试
-void memory_test() {
+// 从位图中扫描 count 个连续的页
+static u32 scan_page(bitmap_t *map, u32 count) {
+    assert(count > 0);
+    // 获取起始页的索引
+    int32 index = bitmap_scan(map, count);
+    if(index == EOF) panic("Scan page fail!!!");
+    // 获取虚拟地址
+    u32 vaddr = PAGE(index);
+    LOGK("Scan page 0x%p count %d\n", vaddr, count);
+    return vaddr;
+}
+
+// 与 scan_page 相对，重置相应的页
+static void reset_page(bitmap_t *map, u32 vaddr, u32 count) {
+    ASSERT_PAGE(vaddr);
+    assert(count > 0);
+    // 获取开始页的索引
+    u32 index = IDX(vaddr);
+    for(size_t i = 0; i < count; ++i) {
+        assert(bitmap_test(map, index + i));
+        bitmap_set(map, index + i, 0);
+    }
+    
+}
+
+// 连续分配count个虚拟页
+u32 alloc_kpage(u32 count) {
+    return scan_page(&kernel_map, count);
+}
+
+// 释放count个连续的内核内存页
+void free_kpage(u32 vaddr, u32 count) {
+    reset_page(&kernel_map, vaddr, count);
+}
+
+// 页目录和页表的简单测试
+void memory_test1() {
     BMB;
     // 将 20 M 0x1400000 内存映射到 64M 0x4000000 的位置
     // 我们还需要一个页表，0x900000
@@ -392,4 +446,19 @@ void memory_test() {
     BMB;
     ptr[2] = 'b';
     BMB;
+}
+
+// 内核虚拟内存分配的位图的测试
+void memory_test() {
+    u32 *pages = (u32 *)(0x200000);
+    u32 count = 0x6fe;
+    for (size_t i = 0; i < count; i++)
+    {
+        pages[i] = alloc_kpage(1);
+        LOGK("0x%x\n", i);
+    }
+    for (size_t i = 0; i < count; i++)
+    {
+        free_kpage(pages[i], 1);
+    }
 }

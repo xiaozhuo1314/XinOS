@@ -16,7 +16,7 @@ void bitmap_make(bitmap_t *map, char *bits, u32 length, u32 offset) {
 
 // 初始化位图
 void bitmap_init(bitmap_t *map, char *bits, u32 length, u32 offset) {
-    memset((void*)map, 0, length);
+    memset((void*)bits, 0, length);
     bitmap_make(map, bits, length, offset);
 }
 
@@ -37,7 +37,7 @@ bool bitmap_test(bitmap_t *map, u32 index) {
     return (((map->bits[byte_idx]) >> bit_idx) & 1);
 }
 
-// 设置位图某位的值, index是比特位
+// 设置位图某位的值, index是页的索引, 也就是第几个bit位
 void bitmap_set(bitmap_t *map, u32 index, bool value) {
     // 索引应该大于等于开始的偏移值
     assert(index >= map->offset);
@@ -54,7 +54,7 @@ void bitmap_set(bitmap_t *map, u32 index, bool value) {
     else map->bits[byte_idx] &= ~(1 << bit_idx);
 }
 
-// 从位图中得到连续的 count个为0的位
+// 从位图中得到连续的 count个为0的位, 返回的是起始页的索引
 int bitmap_scan(bitmap_t *map, u32 count) {
     // 初始化开始位置
     int start = EOF;
@@ -88,39 +88,4 @@ int bitmap_scan(bitmap_t *map, u32 count) {
     }
 
     return start;
-}
-
-#include "xinos/debug.h"
-#define LOGK(fmt, args...) DEBUGK(fmt, ##args)
-#define LEN 2
-u8 buf[LEN];  // 16个比特位的位图
-bitmap_t map;
-void bitmap_tests()
-{
-    bitmap_init(&map, buf, LEN, 0);
-    for (size_t i = 0; i < 33; i++)
-    {
-        // 找个连续0的个数为1的, 所以最多能找16次  0-15
-        idx_t idx = bitmap_scan(&map, 1);
-        if (idx == EOF)
-        {
-            LOGK("TEST FINISH\n");
-            break;
-        }
-        LOGK("%d %d\n", i, idx);
-    }
-
-    memset((void*)buf, 0, LEN);
-    bitmap_init(&map, buf, LEN, 0);
-    for (size_t i = 0; i < 5; i++)
-    {
-        // 找个连续0的个数为1<<i
-        idx_t idx = bitmap_scan(&map, 1 << i);
-        if (idx == EOF)
-        {
-            LOGK("TEST FINISH\n");
-            break;
-        }
-        LOGK("%d %d\n", i, idx);
-    }
 }

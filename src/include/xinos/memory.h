@@ -53,5 +53,9 @@ typedef struct page_entry_t
 u32 get_cr3();
 // 设置cr3寄存器
 void set_cr3(u32 pde);
+// 分配count个连续的内核内存页
+u32 alloc_kpage(u32 count);
+// 释放count个连续的内核内存页
+void free_kpage(u32 vaddr, u32 count);
 
 #endif
