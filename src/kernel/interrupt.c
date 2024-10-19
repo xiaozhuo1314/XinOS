@@ -75,8 +75,6 @@ void send_eoi(int vector) {
     }
 }
 
-u32 counter = 0;
-
 /**
  * 设置特殊的中断处理器
  */
@@ -125,7 +123,7 @@ void default_handler(int vector) {
      * 因此此时就无法再通过中断调用到taska了
     */
     send_eoi(vector);
-    DEBUGK("[0x%x] default interrupt called %d...\n", vector, counter);
+    DEBUGK("[0x%x] default interrupt called...\n", vector);
 }
 
 /**
@@ -218,4 +216,31 @@ void idt_init() {
 void interrupt_init() {
     pic_init();
     idt_init();
+}
+
+// 清除 IF 位，返回设置之前的值
+bool interrupt_disable() {
+    asm volatile(
+        "pushfl\n"         // 将当前 eflags 压入栈中
+        "cli\n"            // 关闭中断, 也就是IF位置为0
+        "popl %eax\n"      // 将刚才压入的 eflags 弹出到 eax
+        "shrl $9, %eax\n"  // 将 eax 右移 9 位, 为了下面得到 IF 位
+        "andl $1, %eax\n"  // 只留下 IF 位
+    );
+}
+
+// 获得 IF 位
+bool get_interrupt_state() {
+    asm volatile(
+        "pushfl\n"         // 将当前 eflags 压入栈中
+        "popl %eax\n"      // 将刚才压入的 eflags 弹出到 eax
+        "shrl $9, %eax\n"  // 将 eax 右移 9 位, 为了下面得到 IF 位
+        "andl $1, %eax\n"  // 只留下 IF 位
+    );
+}
+
+// 设置 IF 位
+void set_interrupt_state(bool state) {
+    if(state) asm volatile("sti\n");
+    else asm volatile("cli\n");
 }
