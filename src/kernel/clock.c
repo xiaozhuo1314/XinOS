@@ -2,6 +2,7 @@
 #include "xinos/interrupt.h"
 #include "xinos/assert.h"
 #include "xinos/debug.h"
+#include "xinos/task.h"
 
 /**
  * 三个计数器
@@ -104,12 +105,28 @@ void clock_handler(int vector) {
     assert(vector == 0x20);
     // 告诉中断控制器已经中断处理完成,否则一直在屏蔽中
     send_eoi(vector);
-
     // 累加计数器
     ++jiffies;
-    // DEBUGK("clock jiffies %d ...\n", jiffies);
     // 调用beeping停止, 尝试去停止
     stop_beep();
+
+    /**
+     * 下面需要更换任务
+     */
+    // 1. 找到当前的任务
+    task_t *task = running_task();
+    // 2. 判断当前任务是否是个正常的任务
+    assert(task->magic == KERNEL_MAGIC);
+    // 3. 保存计数器的值
+    task->jiffies = jiffies;
+    // 4. 减少时间片
+    task->ticks--;
+    if(task->ticks == 0) {
+        // 等于优先级, 也就是后面根据优先级来确定时间
+        task->ticks = task->priority;
+        // 时间片没了需要调度任务
+        schedule();
+    }
 }
 
 /**

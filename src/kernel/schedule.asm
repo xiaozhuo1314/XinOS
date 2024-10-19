@@ -1,3 +1,6 @@
+[bits 32]
+section .text
+
 global task_switch
 
 ; task_switch最重要的就是将ip指针指向其他任务的要执行的指令的地址
