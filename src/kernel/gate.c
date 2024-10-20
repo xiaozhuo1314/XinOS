@@ -46,7 +46,9 @@ static void sys_default() {
 // 测试的任务
 task_t *task = NULL;
 
-// 测试
+// 测试, 在运行过程时, 某一时刻定时器触发时, 一个任务处于block状态(下面的task_block阻塞的), 另一个处于运行态
+// 由于此时定时器触发, 要去调度下一个ready状态的且非当前任务的任务, 但是此时一个任务阻塞, 另一个是当前任务
+// 找不到下一个任务, 此时就会assert(next != NULL);
 static u32 sys_test() {
     if(!task) {
         task = running_task();
