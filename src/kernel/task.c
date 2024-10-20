@@ -5,6 +5,7 @@
 #include "xinos/interrupt.h"
 #include "xinos/string.h"
 #include "xinos/bitmap.h"
+#include "xinos/syscall.h"
 
 // 页的大小为4K
 #define PAGE_SIZE 0x1000
@@ -35,8 +36,6 @@ static task_t* get_free_task() {
  * 从任务数组中查找某种状态的数组, 自己除外
  */
 static task_t* task_search(task_state_t state) {
-    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数, 因为目前的更换任务就是因为中断产生的
-    assert(!get_interrupt_state());
     task_t *task = NULL;
     // 当前任务
     task_t *cur = running_task();
@@ -74,6 +73,8 @@ task_t *running_task() {
  * 调度任务
  */
 void schedule() {
+    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数, 因为目前的更换任务就是因为中断产生的
+    assert(!get_interrupt_state());
     // 当前任务
     task_t *cur = running_task();
     // 获取就绪任务
@@ -103,6 +104,7 @@ u32 thread_a() {
     set_interrupt_state(true);
     while(true) {
         printk("AAA\n");
+        yield(); // 调度任务
     }
 }
 
@@ -112,6 +114,7 @@ u32 thread_b() {
     set_interrupt_state(true);
     while(true) {
         printk("BBB\n");
+        yield();  // 调度任务
     }
 }
 
@@ -121,6 +124,7 @@ u32 thread_c() {
     set_interrupt_state(true);
     while(true) {
         printk("CCC\n");
+        yield(); // 调度任务
     }
 }
 
@@ -183,6 +187,13 @@ static task_t* task_create(target_t target, const char *name, u32 priority, u32 
 }
 
 /**
+ * 任务调度
+ */
+void task_yield() {
+    schedule();
+}
+
+/**
  * 设置任务
  */
 static void task_setup() {
@@ -195,6 +206,9 @@ static void task_setup() {
     memset((void*)task_table, 0, sizeof(task_table));
 }
 
+/**
+ * 初始化任务
+ */
 void task_init() {
     task_setup();
     task_create(thread_a, "a", 5, KERNEL_USER);

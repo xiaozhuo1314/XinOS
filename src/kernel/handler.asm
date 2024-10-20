@@ -187,7 +187,7 @@ syscall_handler: ; 系统调用的处理函数, 参数是在eax寄存器中
     push edx; 第三个参数
     push ecx; 第二个参数
     push ebx; 第一个参数
-    ; 调用系统调用函数, 返回值写到了eax寄存器
+    ; 调用系统调用函数, 返回值写到了eax寄存器, 由于eax中存储的是调用号, 所以能找到
     call [syscall_table + eax * 4]
     ; 弹出三个参数
     add esp, 12

@@ -14,6 +14,7 @@
 #include "xinos/assert.h"
 #include "xinos/interrupt.h"
 #include "xinos/debug.h"
+#include "xinos/syscall.h"
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -22,6 +23,9 @@
 
 // 创建系统调用表, 本质上系统调用也是一种中断0x80, 所以可以使用handler_t来表示系统调用的函数
 handler_t syscall_table[SYSCALL_SIZE];
+
+// 任务调度
+extern void task_yield();
 
 /**
  * 检查调用号
@@ -44,9 +48,13 @@ static u32 sys_test() {
     return 255;
 }
 
+/**
+ * 初始化系统调用, 这样就可以通过数组和调用号找到对应的调用函数
+ */
 void syscall_init() {
     for(size_t i = 0; i < SYSCALL_SIZE; ++i) {
         syscall_table[i] = sys_default;
     }
-    syscall_table[0] = sys_test;
+    syscall_table[SYS_NR_TEST] = sys_test;
+    syscall_table[SYS_NR_YIELD] = task_yield;
 }

@@ -33,5 +33,5 @@ void kernel_init() {
     // rtc_init();
     task_init();
     syscall_init();
-    // set_interrupt_state(true);  // 开启中断
+    set_interrupt_state(true);  // 开启中断
 }
