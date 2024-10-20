@@ -18,7 +18,7 @@ static _inline u32 _syscall0(u32 num) {
     u32 ret;
     asm volatile(
         "int $0x80\n"
-        : "a="(ret)
+        : "=a"(ret)
         : "a"(num)
     );
     return ret;
