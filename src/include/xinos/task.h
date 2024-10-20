@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "bitmap.h"
+#include "list.h"
 
 // 定义任务的user id
 #define KERNEL_USER 0
@@ -35,6 +36,7 @@ typedef enum task_state_t {
  */
 typedef struct task_t {
     u32 *stack;                           // 内核栈
+    list_node_t node;                     // 任务阻塞的节点
     task_state_t state;                   // 任务状态
     u32 priority;                         // 任务优先级
     u32 ticks;                            // 所剩的时间片
@@ -65,5 +67,14 @@ task_t *running_task();
 void schedule();
 // 任务调度
 void task_yield();
+/**
+ * 任务阻塞
+ * task: 任务结构体
+ * blist: 要阻塞的链表
+ * state: 任务状态
+ */
+void task_block(task_t *task, list_t *blist, task_state_t state);
+// 任务停止阻塞
+void task_unblock(task_t *task);
 
 #endif

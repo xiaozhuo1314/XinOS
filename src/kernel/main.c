@@ -14,17 +14,6 @@ extern void task_init();
 extern void syscall_init();
 extern void list_test();
 
-#define LOGK(fmt, args...) DEBUGK(fmt, ##args)
-
-void intr_test()
-{
-    bool intr = interrupt_disable();
-    // do something
-    set_interrupt_state(intr);
-}
-
-extern void memory_test();
-
 void kernel_init() {
     memory_map_init();
     mapping_init();
@@ -34,6 +23,5 @@ void kernel_init() {
     // rtc_init();
     task_init();
     syscall_init();
-    list_test();
-    // set_interrupt_state(true);  // 开启中断
+    set_interrupt_state(true);  // 开启中断
 }

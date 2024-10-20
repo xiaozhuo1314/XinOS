@@ -6,6 +6,7 @@
 #include "xinos/string.h"
 #include "xinos/bitmap.h"
 #include "xinos/syscall.h"
+#include "xinos/list.h"
 
 // 页的大小为4K
 #define PAGE_SIZE 0x1000
@@ -19,6 +20,8 @@ extern void task_switch(task_t *next);
 #define NR_TASKS 64
 // 任务数组
 static task_t* task_table[NR_TASKS];
+// 任务默认阻塞链表
+static list_t block_list;
 
 /**
  * 在task_table生成一个空闲任务
@@ -104,7 +107,7 @@ u32 thread_a() {
     set_interrupt_state(true);
     while(true) {
         printk("AAA\n");
-        yield(); // 调度任务
+        test(); // 测试
     }
 }
 
@@ -114,7 +117,7 @@ u32 thread_b() {
     set_interrupt_state(true);
     while(true) {
         printk("BBB\n");
-        yield();  // 调度任务
+        test(); // 测试
     }
 }
 
@@ -124,7 +127,7 @@ u32 thread_c() {
     set_interrupt_state(true);
     while(true) {
         printk("CCC\n");
-        yield(); // 调度任务
+        test(); // 测试
     }
 }
 
@@ -207,11 +210,52 @@ static void task_setup() {
 }
 
 /**
+ * 任务阻塞
+ * task: 任务结构体
+ * blist: 要阻塞的链表
+ * state: 任务状态
+ */
+void task_block(task_t *task, list_t *blist, task_state_t state) {
+    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数
+    assert(!get_interrupt_state());
+    // 判断任务前后是否为空, 不为空说明已经在阻塞链表了
+    assert(task->node.prev == NULL);
+    assert(task->node.next == NULL);
+    // 如果阻塞链表为空就设置默认的
+    if(blist == NULL) blist = &block_list;
+    // 放置到阻塞链表
+    list_pushfront(blist, &task->node);
+    // 要设置的状态不能为ready或者running, 因为我们需要去阻塞这个任务
+    assert(state != TASK_READY && state != TASK_RUNNING);
+    task->state = state;
+    // 获取当前任务
+    task_t *cur = running_task();
+    // 如果是当前任务, 就需要去调度, 因为我们要把当前任务阻塞
+    if(cur == task) schedule();
+}
+
+// 任务停止阻塞
+void task_unblock(task_t *task) {
+    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数
+    assert(!get_interrupt_state());
+    // 从阻塞链表删除
+    list_remove(&task->node);
+    // 解除后应该前后为空
+    assert(task->node.prev == NULL && task->node.next == NULL);
+    // 设置为就绪态
+    task->state = TASK_READY;
+}
+
+/**
  * 初始化任务
  */
 void task_init() {
+    // 初始化阻塞链表
+    list_init(&block_list);
+    // 设置task
     task_setup();
+    // 创建任务
     task_create(thread_a, "a", 5, KERNEL_USER);
     task_create(thread_b, "b", 5, KERNEL_USER);
-    task_create(thread_c, "c", 5, KERNEL_USER);
+    // task_create(thread_c, "c", 5, KERNEL_USER);
 }

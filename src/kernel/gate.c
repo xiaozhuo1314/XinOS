@@ -15,6 +15,7 @@
 #include "xinos/interrupt.h"
 #include "xinos/debug.h"
 #include "xinos/syscall.h"
+#include "xinos/task.h"
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -42,9 +43,18 @@ static void sys_default() {
     panic("syscall not implemented!!!");
 }
 
+// 测试的任务
+task_t *task = NULL;
+
 // 测试
 static u32 sys_test() {
-    LOGK("syscall test...\n");
+    if(!task) {
+        task = running_task();
+        task_block(task, NULL, TASK_BLOCKED);
+    } else {
+        task_unblock(task);
+        task = NULL;
+    }
     return 255;
 }
 
