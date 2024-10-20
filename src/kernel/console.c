@@ -1,6 +1,7 @@
 #include "xinos/console.h"
 #include "xinos/io.h"
 #include "xinos/string.h"
+#include "xinos/interrupt.h"
 
 /**
  * 一些宏
@@ -195,6 +196,9 @@ static void command_default(char c) {
 
 // 往屏幕写, 其实用汇编写更好, 但是这里用C语言来写
 void console_write(char *buf, u32 count) {
+    // 写的时候禁止中断
+    bool intr = interrupt_disable();
+
     char c;
     while(count--) {
         c = *buf++;
@@ -237,6 +241,9 @@ void console_write(char *buf, u32 count) {
     }
     // 光标移到后面
     set_cursor();
+
+    // 恢复中断
+    set_interrupt_state(intr);
 }
 
 void console_init() {

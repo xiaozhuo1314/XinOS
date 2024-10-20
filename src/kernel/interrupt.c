@@ -63,7 +63,7 @@ static char *messages[] = {
 extern void schedule();
 
 /**
- * 通知中断控制器中断处理结束了
+ * 通知中断控制器中断处理结束了, 但是此时IF位还是为0, 表示cpu不接受中断
  * vector: 外部中断向量
 */
 void send_eoi(int vector) {

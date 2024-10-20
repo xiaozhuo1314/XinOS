@@ -44,11 +44,11 @@ interrupt_entry:
     pop ds
     ; 去掉前面压入的%1和%2
     add esp, 8
-    ; 返回, 要用iret
+    ; 返回, 要用iret, 除了跟ret一样的寄存器外, 还会将原先的eflags值弹回到eflags寄存器
     iret
 
 ; 宏展开, 就得到了每一个interrupt_handler_%1函数
-; 下面是异常
+; 下面是异常, 第二个参数为0表示没有第二个参数
 INTERRUPT_HANDLER 0x00, 0; divide by zero
 INTERRUPT_HANDLER 0x01, 0; debug
 INTERRUPT_HANDLER 0x02, 0; non maskable interrupt

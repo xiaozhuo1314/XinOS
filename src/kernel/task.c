@@ -25,7 +25,7 @@ static task_t* task_table[NR_TASKS];
 static task_t* get_free_task() {
     for(size_t i = 0; i < NR_TASKS; ++i) {
         if(task_table[i] == NULL) {
-            return task_table[i] = (task_t*)alloc_kpage(1); // 后续还得free内存
+            return task_table[i] = (task_t*)alloc_kpage(1); // todo后续还得free内存
         }
     }
     panic("No more tasks");
@@ -84,14 +84,22 @@ void schedule() {
 
     // 更改当前任务的属性
     if(cur->state == TASK_RUNNING) cur->state = TASK_READY;
+    // 如果当前任务没有了时间片, 就让时间片等于优先级
+    if(cur->ticks == 0) cur->ticks = cur->priority;
     // 更改下一个任务的属性
     next->state = TASK_RUNNING;
-    // 切换任务
+    // 切换任务, 由于这个切换是通过中断的多层函数调用到这里, 因此栈顶的位置不是任务创建时的stack位置
+    // 当任务切换回当前任务后, 按照函数调用的原则, 就会从下一行的printk继续执行
+    // 把多层函数调用返回, 也就是把那个时候的中断处理执行完, 又由于中断的时候会保存当时任务执行的下一条语句
+    // 假设是thread_x的printk函数, 那么中断函数处理完后才会去执行printk函数打印
     task_switch(next);
+
+    printk("back to task %s\n", cur->name);
 }
 
 u32 thread_a() {
-    // 由于中断之后if位为0, 所以这里需要置为1, 这样就可以接收所有中断了
+    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
+    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
     set_interrupt_state(true);
     while(true) {
         printk("AAA\n");
@@ -99,7 +107,8 @@ u32 thread_a() {
 }
 
 u32 thread_b() {
-    // 由于中断之后if位为0, 所以这里需要置为1, 这样就可以接收所有中断了
+    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
+    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
     set_interrupt_state(true);
     while(true) {
         printk("BBB\n");
@@ -107,7 +116,8 @@ u32 thread_b() {
 }
 
 u32 thread_c() {
-    // 由于中断之后if位为0, 所以这里需要置为1, 这样就可以接收所有中断了
+    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
+    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
     set_interrupt_state(true);
     while(true) {
         printk("CCC\n");
@@ -166,7 +176,7 @@ static task_t* task_create(target_t target, const char *name, u32 priority, u32 
     task->state = TASK_READY;
     task->uid = uid;
     task->vmap = &kernel_map;  // 目前是内核任务
-    task->pde = KERNEL_PAGE_DIR;
+    task->pde = KERNEL_PAGE_DIR; // 页表目录位置
     task->magic = KERNEL_MAGIC;
 
     return task;
@@ -188,6 +198,6 @@ static void task_setup() {
 void task_init() {
     task_setup();
     task_create(thread_a, "a", 5, KERNEL_USER);
-    task_create(thread_a, "b", 5, KERNEL_USER);
-    task_create(thread_a, "c", 5, KERNEL_USER);
+    task_create(thread_b, "b", 5, KERNEL_USER);
+    task_create(thread_c, "c", 5, KERNEL_USER);
 }

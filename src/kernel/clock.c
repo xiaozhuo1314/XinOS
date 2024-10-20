@@ -122,8 +122,6 @@ void clock_handler(int vector) {
     // 4. 减少时间片
     task->ticks--;
     if(task->ticks == 0) {
-        // 等于优先级, 也就是后面根据优先级来确定时间
-        task->ticks = task->priority;
         // 时间片没了需要调度任务
         schedule();
     }
