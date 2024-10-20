@@ -17,4 +17,9 @@ _start:
     ; 因此在执行memory_init的时候是可以当作参数使用的
     call memory_init
     call kernel_init
+
+    xchg bx, bx
+    mov eax, 0
+    int 0x80
+    xchg bx, bx
     jmp $

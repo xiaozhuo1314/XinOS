@@ -34,6 +34,10 @@ interrupt_entry:
     push eax
     ; 调用终端处理函数, handler_table中每个函数地址都占用4个字节
     call [handler_table + eax * 4]
+
+; 结束中断调用, iret之后就会回到中断产生时的下一条语句
+global interrupt_exit
+interrupt_exit:
     ; 调用完后回复栈, 去掉参数
     add esp, 4
     ; 恢复寄存器
@@ -154,3 +158,40 @@ handler_entry_table:
     dd interrupt_handler_0x2d
     dd interrupt_handler_0x2e
     dd interrupt_handler_0x2f
+
+section .text
+extern syscall_check
+extern syscall_table
+global syscall_handler
+syscall_handler: ; 系统调用的处理函数, 参数是在eax寄存器中
+    ; 验证系统调用号
+    push eax ; 参数压栈
+    call syscall_check
+    add esp, 4 ; 参数出栈
+
+    ; 为了跟interrupt_handler中push魔数和中断号保持一致, 所以需要加上这两个, 没什么实际的意义
+    push 0x20180719
+    push 0x80
+
+    ; 保存段寄存器
+    push ds
+    push es
+    push fs
+    push gs
+    ; 保存8个功能寄存器
+    pusha
+
+    ; 向中断处理函数传递向量号
+    push 0x80
+    ; 系统调用的参数
+    push edx; 第三个参数
+    push ecx; 第二个参数
+    push ebx; 第一个参数
+    ; 调用系统调用函数, 返回值写到了eax寄存器
+    call [syscall_table + eax * 4]
+    ; 弹出三个参数
+    add esp, 12
+    ; pusha中我们把eax作为第一个压入了, 此时我们修改eax所在栈中的值, 作为系统调用返回值, 后续pop的时候会弹出到eax寄存器
+    mov dword [esp + 8 * 4], eax
+    ; 中断返回, 会首先把0x80弹出, 然后popa, 然后pop段寄存器, 然后pop魔数和0x80
+    jmp interrupt_exit

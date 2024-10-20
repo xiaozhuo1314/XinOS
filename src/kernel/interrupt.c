@@ -34,6 +34,9 @@ handler_t handler_table[IDT_SIZE];
 // 处理函数入口表
 extern handler_t handler_entry_table[ENTRY_SIZE];
 
+// 系统调用处理函数
+extern void syscall_handler();
+
 // 异常需要展示的信息
 static char *messages[] = {
     "#DE Divide Error\0",
@@ -205,6 +208,17 @@ void idt_init() {
         else
             handler_table[i] = default_handler;
     }
+    // 设置系统调用
+    gate_t *syscall_gate = &idt[0x80];
+    syscall_gate->offset0 = (u32)syscall_handler & 0xffff;
+    syscall_gate->offset1 = ((u32)syscall_handler >> 16) & 0xffff;
+    syscall_gate->selector = (1 << 3);                                                         // 代码段
+    syscall_gate->reserved = 0;                                                                // 保留
+    syscall_gate->type = 0b1110;                                                               // 中断门
+    syscall_gate->segment = 0;                                                                 // 系统段
+    syscall_gate->DPL = 3;                                                                     // 用户态
+    syscall_gate->present = 1;                                                                 // 有效
+
     // 设置idt指针
     idt_ptr.base = (u32)&idt;
     idt_ptr.limit = sizeof(idt) - 1;

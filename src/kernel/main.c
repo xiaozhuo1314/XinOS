@@ -11,6 +11,7 @@ extern void rtc_init();
 extern void memory_map_init(); // 物理内存数组设置
 extern void mapping_init(); // 内存映射
 extern void task_init();
+extern void syscall_init();
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -31,5 +32,6 @@ void kernel_init() {
     // time_init();
     // rtc_init();
     task_init();
-    set_interrupt_state(true);  // 开启中断
+    syscall_init();
+    // set_interrupt_state(true);  // 开启中断
 }
