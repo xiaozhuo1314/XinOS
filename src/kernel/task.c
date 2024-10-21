@@ -22,6 +22,8 @@ extern void task_switch(task_t *next);
 static task_t* task_table[NR_TASKS];
 // 任务默认阻塞链表
 static list_t block_list;
+// idle任务, 是一个一直在运行的, 当其他任务都被阻塞的时候, 就去这个任务执行, idle的id号一般为0
+static task_t *idle_task;
 
 /**
  * 在task_table生成一个空闲任务
@@ -52,6 +54,9 @@ static task_t* task_search(task_state_t state) {
         if(task == NULL || task->ticks < ptr->ticks || task->jiffies > ptr->jiffies)
             task = ptr;
     }
+    // 如果找不到满足state的任务, 而且要找的正好是ready状态的任务, 那么直接运行idle任务
+    if(task == NULL && state == TASK_READY) task = idle_task;
+
     return task;
 }
 
@@ -101,35 +106,10 @@ void schedule() {
     printk("back to task %s\n", cur->name);
 }
 
-u32 thread_a() {
-    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
-    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
-    set_interrupt_state(true);
-    while(true) {
-        printk("AAA\n");
-        test(); // 测试
-    }
-}
-
-u32 thread_b() {
-    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
-    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
-    set_interrupt_state(true);
-    while(true) {
-        printk("BBB\n");
-        test(); // 测试
-    }
-}
-
-u32 thread_c() {
-    // 由于中断之后if位为0, 而此时中断并未返回也就是没有执行iret弹回原来的eflags值
-    // 所以这里需要人为置为1, 这样就可以接收中断切换任务了
-    set_interrupt_state(true);
-    while(true) {
-        printk("CCC\n");
-        test(); // 测试
-    }
-}
+// idle任务
+extern void idle_thread();
+// init任务, 跟idle不是同一个任务, init任务是用户态的, idle是内核态的
+extern void init_thread();
 
 /**
  * 创建任务
@@ -252,10 +232,10 @@ void task_unblock(task_t *task) {
 void task_init() {
     // 初始化阻塞链表
     list_init(&block_list);
-    // 设置task
+    // 设置task, 初始化task_table
     task_setup();
     // 创建任务
-    task_create(thread_a, "a", 5, KERNEL_USER);
-    task_create(thread_b, "b", 5, KERNEL_USER);
-    // task_create(thread_c, "c", 5, KERNEL_USER);
+    idle_task = task_create(idle_thread, "idle", 1, KERNEL_USER);
+    // 创建init
+    task_create(init_thread, "init", 5, NORMAL_USER);
 }
