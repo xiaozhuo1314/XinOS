@@ -11,7 +11,7 @@
 // 任务名称最长名字
 #define TASK_NAME_LEN 16
 
-typedef u32 target_t();  // 定义了函数, 是u32类型的, 用于cpu去执行
+typedef void target_t();  // 定义了函数, 用于cpu去执行
 
 /**
  * 任务的状态, 进程的状态
@@ -76,5 +76,9 @@ void task_yield();
 void task_block(task_t *task, list_t *blist, task_state_t state);
 // 任务停止阻塞
 void task_unblock(task_t *task);
+// 任务休眠
+void task_sleep(u32 ms);
+// 任务唤醒
+void task_wakeup();
 
 #endif

@@ -25,9 +25,6 @@
 // 创建系统调用表, 本质上系统调用也是一种中断0x80, 所以可以使用handler_t来表示系统调用的函数
 handler_t syscall_table[SYSCALL_SIZE];
 
-// 任务调度
-extern void task_yield();
-
 /**
  * 检查调用号
  * num: 调用号
@@ -68,5 +65,6 @@ void syscall_init() {
         syscall_table[i] = sys_default;
     }
     syscall_table[SYS_NR_TEST] = sys_test;
+    syscall_table[SYS_NR_SLEEP] = task_sleep;
     syscall_table[SYS_NR_YIELD] = task_yield;
 }

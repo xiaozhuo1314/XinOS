@@ -24,6 +24,19 @@ static _inline u32 _syscall0(u32 num) {
     return ret;
 }
 
+/**
+ * 产生int 0x80中断的函数
+ */
+static _inline u32 _syscall1(u32 nr, u32 arg) {
+    u32 ret;
+    asm volatile(
+        "int $0x80\n"
+        : "=a"(ret)
+        : "a"(nr), "b"(arg)
+    );
+    return ret;
+}
+
 u32 test() {
     return _syscall0(SYS_NR_TEST);
 }
@@ -33,4 +46,9 @@ u32 test() {
  */
 void yield() {
     _syscall0(SYS_NR_YIELD);
+}
+
+// 睡眠函数
+void sleep(u32 ms) {
+    _syscall1(SYS_NR_SLEEP, ms);
 }

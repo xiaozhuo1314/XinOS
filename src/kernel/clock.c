@@ -97,6 +97,9 @@ void stop_beep() {
     }
 }
 
+// 定时器到了就去唤醒任务
+extern void task_wakeup();
+
 /**
  * 时钟中断处理函数
  */
@@ -109,6 +112,8 @@ void clock_handler(int vector) {
     ++jiffies;
     // 调用beeping停止, 尝试去停止
     stop_beep();
+    // 唤醒睡眠结束的任务, 这样下面就可以去切换任务了
+    task_wakeup();
 
     /**
      * 下面需要更换任务

@@ -7,6 +7,7 @@
 #include "xinos/bitmap.h"
 #include "xinos/syscall.h"
 #include "xinos/list.h"
+#include "xinos/math.h"
 
 // 页的大小为4K
 #define PAGE_SIZE 0x1000
@@ -22,8 +23,15 @@ extern void task_switch(task_t *next);
 static task_t* task_table[NR_TASKS];
 // 任务默认阻塞链表
 static list_t block_list;
+// 任务默认睡眠链表
+static list_t sleep_list;
+
 // idle任务, 是一个一直在运行的, 当其他任务都被阻塞的时候, 就去这个任务执行, idle的id号一般为0
 static task_t *idle_task;
+// clock.c中的时间计数器jiffies
+extern u32 volatile jiffies;
+// clock.c中的频率
+extern u32 jiffy;
 
 /**
  * 在task_table生成一个空闲任务
@@ -103,13 +111,15 @@ void schedule() {
     // 假设是thread_x的printk函数, 那么中断函数处理完后才会去执行printk函数打印, 栈顶才会回到当时的位置
     task_switch(next);
 
-    printk("back to task %s\n", cur->name);
+    // printk("back to task %s\n", cur->name);
 }
 
 // idle任务
 extern void idle_thread();
 // init任务, 跟idle不是同一个任务, init任务是用户态的, idle是内核态的
 extern void init_thread();
+// 测试
+extern void test_thread();
 
 /**
  * 创建任务
@@ -214,7 +224,10 @@ void task_block(task_t *task, list_t *blist, task_state_t state) {
     if(cur == task) schedule();
 }
 
-// 任务停止阻塞
+/**
+ * 任务停止阻塞
+ * 由于task_unblock并未指定链表, 所以list_remove的时候是在任务所在链表删除, 可能是阻塞链表也可能是睡眠链表等等
+ */
 void task_unblock(task_t *task) {
     // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数
     assert(!get_interrupt_state());
@@ -227,15 +240,78 @@ void task_unblock(task_t *task) {
 }
 
 /**
+ * 任务休眠
+ */
+void task_sleep(u32 ms) {
+    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数
+    assert(!get_interrupt_state());
+    // 计算需要睡眠的时间片, 至少一个时间片
+    u32 ticks = max(ms / jiffy, 1);
+
+    // 当前任务睡眠
+    task_t *cur = running_task();
+    cur->ticks = ticks;
+    cur->jiffies = jiffies;
+
+    // 判断任务前后是否为空, 不为空说明已经在睡眠链表了
+    assert(cur->node.prev == NULL);
+    assert(cur->node.next == NULL);
+
+    /**
+     * 放置在睡眠链表, 这里要注意的是, 我们要按照唤醒时间进行排序, 当然也可以todo 时间堆或者时间轮, 这里先用排序链表
+     */
+    // 1. 找到要插入的位置
+    list_t *list = &sleep_list;
+    list_node_t *anchor = list->head.next;
+    for(; anchor != &list->tail; anchor = anchor->next) {
+        task_t *task = element_entry(task_t, node, anchor);
+        if((task->jiffies + task->ticks) >= (cur->jiffies + cur->ticks)) 
+            break;
+    }
+    // 2. 修改状态
+    cur->state = TASK_SLEEPING;
+    // 3. 插入
+    list_insert_before(anchor, &cur->node);
+
+    // 调度
+    schedule();
+}
+
+// 任务唤醒
+void task_wakeup() {
+    // 当前必须要处于屏蔽中断的状态, 否则会有中断来了打断这个函数
+    assert(!get_interrupt_state());
+
+    // 找到小于等于当前时间片的任务进行唤醒
+    list_t *list = &sleep_list;
+    for(list_node_t *ptr = list->head.next; ptr != &list->tail;) {
+        task_t *task = element_entry(task_t, node, ptr);
+        if((task->jiffies + task->ticks) > jiffies)
+            break;
+        
+        // task_unblock调用的list_remove, 由于list_remove会将node的prev和next置为NULL
+        // 这样ptr指向的list_node结构体内存的prev和next为NULL, 也就无法获取下一个了, 所以这里先去指向下一个
+        ptr = ptr->next;
+        // 从链表中删除
+        task->ticks = 0;
+        task_unblock(task);
+    }
+}
+
+/**
  * 初始化任务
  */
 void task_init() {
     // 初始化阻塞链表
     list_init(&block_list);
+    // 初始化睡眠链表
+    list_init(&sleep_list);
     // 设置task, 初始化task_table
     task_setup();
     // 创建任务
     idle_task = task_create(idle_thread, "idle", 1, KERNEL_USER);
     // 创建init
     task_create(init_thread, "init", 5, NORMAL_USER);
+    // 创建test
+    task_create(test_thread, "test", 5, KERNEL_USER);
 }
